@@ -1,0 +1,7 @@
+# local prototype + reference assets (not part of the deployed app)
+md-viewer/
+just_for_reference/
+
+# os / editor cruft
+.DS_Store
+*.log

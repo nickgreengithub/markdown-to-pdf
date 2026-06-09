@@ -126,7 +126,10 @@
 .doc ul, .doc ol, .doc blockquote, .doc pre, .doc table, .doc dl, .doc figure {
   margin: 0 0 var(--para);
 }
-.doc p { text-align: var(--body-align, justify); hyphens: auto; margin: var(--para-above, 0em) 0 var(--para); }
+.doc p {
+  text-align: var(--body-align, justify); hyphens: auto; margin: var(--para-above, 0em) 0 var(--para);
+  padding-bottom: calc(var(--body-bar, 0) * 0.25em); border-bottom: calc(var(--body-bar, 0) * 1px) solid var(--rule);
+}
 
 .doc a {
   color: var(--link-color, var(--accent));

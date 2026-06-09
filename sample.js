@@ -1,86 +1,124 @@
-window.SAMPLE_MD = `# Quarterly Engineering Review
-**Platform Group** · Q2 2026 · Prepared by A. Rivera
+/* Bundled default document. Figure is inlined as a data URI so it always renders
+   (no separate asset fetch, works on GitHub Pages, print, and zip export). */
+(function () {
+  const FIG = 'data:image/svg+xml,' + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="820" height="260" viewBox="0 0 820 260">'
+    + '<rect width="820" height="260" fill="#eef3ff"/>'
+    + '<rect x="24" y="66" width="772" height="124" rx="62" fill="#fff" stroke="#2f64e6" stroke-width="5"/>'
+    + '<line x1="64" y1="172" x2="756" y2="172" stroke="#c7d4f5" stroke-width="6" stroke-linecap="round"/>'
+    + '<g stroke="#b8402a" stroke-width="5" stroke-linecap="round">'
+    + '<line x1="128" y1="100" x2="58" y2="100"/><line x1="150" y1="130" x2="48" y2="130"/>'
+    + '<line x1="128" y1="160" x2="68" y2="160"/></g>'
+    + '<rect x="300" y="94" width="272" height="66" rx="33" fill="#2f64e6"/>'
+    + '<circle cx="552" cy="127" r="7" fill="#ffd66b"/>'
+    + '<rect x="328" y="108" width="38" height="38" rx="9" fill="#eef3ff"/>'
+    + '<rect x="382" y="108" width="38" height="38" rx="9" fill="#eef3ff"/>'
+    + '<rect x="436" y="108" width="38" height="38" rx="9" fill="#eef3ff"/>'
+    + '<circle cx="340" cy="123" r="3.4" fill="#1b1d22"/><circle cx="354" cy="123" r="3.4" fill="#1b1d22"/>'
+    + '<path d="M338 136 q9 -6 18 0" stroke="#1b1d22" stroke-width="2.4" fill="none" stroke-linecap="round"/>'
+    + '<text x="410" y="228" text-anchor="middle" font-size="22" fill="#33415c" font-weight="600">'
+    + 'Fig 1 - A pod, allegedly at 1,180 km/h</text></svg>'
+  );
 
-> A concise snapshot of delivery, reliability, and what we're carrying into Q3. Read time ≈ 4 minutes.
+  window.SAMPLE_MD = `# Hyperloop: A Study of Going Very Fast in a Tube
+
+**Department of Optimistic Transit** · Vol. 88, No. 3 · Peer-reviewed by *three guys on a forum*
+
+> **Abstract.** We investigate whether humans can be fired through a steel straw at airline speeds without spilling their coffee. Findings: the speed is achievable; the coffee is not. Funding generously provided by a man who *really* hates traffic.
 
 ---
 
-## 1. Executive Summary
+## 1. Introduction
 
-This quarter the team shipped the **billing migration**, cut p95 latency by *38%*, and closed the long-standing backlog on auth. Two initiatives slipped and are re-scoped below. Overall we are **on track** against the annual plan.
+For over a century, engineers have dreamed of travel that is **faster than a train**, *cheaper than a plane*, and ~~financially realistic~~ visionary. The Hyperloop promises all three, provided you ignore the third. At its core the concept is simple: remove the air, add a pod, and let physics do the marketing.
 
-Key result: a single, well-formed Markdown document renders to a print-ready A4 page in one paste — no formatting busywork.
+As the great philosophers noted, \`velocity = distance / vibes\`. We adopt this as our governing equation.
 
-### Highlights
+See also our earlier work, [On the Feasibility of Catapulting Commuters](#), which the ethics board described as "a cry for help."
 
-- Migrated 2.1M accounts to the new ledger with zero data loss
-- Reduced build times from 11m → 4m via remote caching
-- Onboarded 3 engineers; ramp time down to ~2 weeks
-- Published the internal [API style guide](#)
+### 1.1 Research Questions
 
-## 2. Reliability
+- Can a pod reach 1,200 km/h without turning lunch into a wall decoration?
+- Will passengers accept windows that show only darkness?
+- Is "mild existential dread" an acceptable in-flight amenity?
 
-We track four golden signals. The table below summarizes the quarter.
+### 1.2 A Note on Tone
 
-| Service    | p95 (ms) | Error rate | Uptime  | Trend |
-|------------|---------:|-----------:|--------:|:-----:|
-| Gateway    |       82 |     0.02 % | 99.98 % |   ↑   |
-| Ledger     |      140 |     0.05 % | 99.95 % |   ↑   |
-| Search     |      210 |     0.11 % | 99.90 % |   →   |
-| Notifier   |       64 |     0.01 % | 99.99 % |   ↑   |
+This paragraph exists purely so the **Body** style can prove it stays calm and readable, even while the surrounding text describes terrifying acceleration. Well done, body text. Stay strong.
 
-> **Note** — the Search regression in week 7 traced back to a cold cache after a deploy. Mitigation: staged warm-up. See incident #4412.
+## 2. Methodology
 
-## 3. What Shipped
-
-Ranked checklist of committed work:
-
-- [x] Billing ledger migration
-- [x] Remote build cache rollout
-- [x] Auth backlog (12 tickets)
-- [ ] Multi-region failover *(slipped → Q3)*
-- [ ] Audit log export *(re-scoped, smaller)*
-
-### Code Snapshot
-
-A representative slice of the new rate limiter:
+We built a test rig from **two vacuum cleaners**, *a garden hose*, and unshakable confidence. Measurements were taken in \`SI units\`, then quietly converted to "feels about right."
 
 \`\`\`python
-def allow(key: str, limit: int, window: float) -> bool:
-    now = time.monotonic()
-    bucket = buckets.setdefault(key, deque())
-    while bucket and bucket[0] <= now - window:
-        bucket.popleft()
-    if len(bucket) >= limit:
-        return False           # over budget
-    bucket.append(now)
-    return True
+def passenger_g_force(speed_kmh, patience):
+    g = (speed_kmh / 100) ** 2 / max(patience, 0.01)
+    if g > 5:
+        return "please remain calm"   # they will not remain calm
+    return "acceptable"
+
+print(passenger_g_force(1200, patience=0.3))
 \`\`\`
 
-Inline references work too: call \`allow(user_id, 100, 60)\` before each write, and wrap reads with the \`@cached\` decorator.
+Inline check: we call \`passenger_g_force(1200, 0.3)\` before boarding and, for legal reasons, again after.
 
-## 4. Numbers That Matter
+### 2.1 Test Schedule
 
-1. **Deploys:** 214 (↑ 19% QoQ)
-2. **Change-fail rate:** 4.1% (target < 5%)
-3. **MTTR:** 22 min (↓ from 41 min)
-4. **On-call pages:** 0.7 / night median
+1. Build tube
+2. Briefly question life choices
+3. Insert pod
+4. Run *exactly one* test
+5. Hold a triumphant press conference regardless of outcome
 
-## 5. Risks & Asks
+## 3. Results
 
-We need a decision on multi-region by **July 15**. Without it, failover slips again.
+The data are summarized below. The trends are, scientifically, going up.
 
-| Risk | Likelihood | Impact | Owner |
-|------|:----------:|:------:|-------|
-| Region capacity | Medium | High | Infra |
-| Vendor SLA gap  | Low    | High | Eng   |
-| Hiring ramp     | Medium | Med  | Mgmt  |
+| Metric                 |   Target |  Observed | Verdict |
+|------------------------|---------:|----------:|:-------:|
+| Top speed (km/h)       |    1,200 |     1,180 |   😎    |
+| Coffee retained (%)    |      100 |        12 |   ☠️    |
+| Passenger volume (dB)  |       40 |       118 |   📈    |
+| Investor confidence    | Boundless | Boundless |   💸    |
+
+![Figure 1: a pod, allegedly](${FIG})
+
+> **Note.** Reviewer 2 insists the screaming is a *feature*, providing "free in-cabin entertainment and a natural smoke alarm."
+
+### 3.1 Safety Checklist
+
+- [x] Tube is, in fact, a tube
+- [x] Pod fits inside tube
+- [x] Emergency snacks loaded
+- [ ] Emergency exit identified
+- [ ] Reason the emergency exit does not exist
+
+#### 3.1.1 Minor Concerns
+
+A small heading-four footnote for completeness: the brakes are currently best described as "aspirational."
+
+## 4. Risk Assessment
+
+| Risk                | Likelihood | Impact |     Mitigation      |
+|---------------------|:----------:|:------:|:-------------------:|
+| Pod gets stuck      |   Medium   |  High  |       Push it       |
+| Tube springs a leak |    High    |  High  |        Tape         |
+| Physics says no     |  Low (ish) | Cosmic |  Ask physics nicely |
+
+Note: the "Low (ish)" rating was supplied by our most enthusiastic intern.
+
+## 5. Conclusion
+
+The Hyperloop is **technically possible**, *spiritually questionable*, and **financially** — let's move on. We recommend immediate funding, a slightly longer tube, and dramatically better coffee lids.
 
 ---
 
-### Appendix
+### Appendix A — Glossary
 
-Terms: **SLA** service level agreement · **MTTR** mean time to recovery · use <kbd>⌘</kbd>+<kbd>P</kbd> to export this page to PDF.
+Terms: **Pod** a tube for a person, inside a tube for the pod · **Vacuum** the thing our budget abhors · **Soon™** any time between next quarter and the heat death of the universe.
 
-*Document ends. Replace this sample with your own Markdown — the page on the right updates as you type.*
+Tip: press <kbd>⌘</kbd>+<kbd>P</kbd> to export this masterpiece to PDF and frame it above your desk.
+
+*End of report. Replace it with your own Markdown — unless you, too, dream of tubes.*
 `;
+})();

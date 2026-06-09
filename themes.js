@@ -21,7 +21,6 @@ window.VAR_SPEC = [
   { key: 'page-pad',  label: 'Page margin',   type: 'range', min: 8, max: 35, step: 1, unit: 'mm' },
   { key: 'measure',   label: 'Text measure',  type: 'measure' },
   { key: 'ink',       label: 'Text',          type: 'color' },
-  { key: 'paper',     label: 'Paper',         type: 'color' },
   { key: 'accent',    label: 'Accent',        type: 'color' },
   { key: 'muted',     label: 'Muted',         type: 'color' },
   { key: 'rule',      label: 'Rules / borders', type: 'color' },
@@ -30,7 +29,6 @@ window.VAR_SPEC = [
 
 const SANS  = "'Public Sans', system-ui, sans-serif";
 const FRANK = "'Libre Franklin', system-ui, sans-serif";
-const PLEX  = "'IBM Plex Sans', system-ui, sans-serif";
 const SERIF = "'Source Serif 4', Georgia, serif";
 const SPECT = "'Spectral', Georgia, serif";
 const NEWS  = "'Newsreader', Georgia, serif";
@@ -53,18 +51,8 @@ window.THEMES = [
       'font-body': SERIF, 'font-head': SERIF, 'font-mono': MONO,
       'fs-base': '16px', 'lh': '1.72', 'scale': '1.22', 'para': '0.95em',
       'page-pad': '26mm', 'measure': 'none',
-      'ink': '#1c1a16', 'paper': '#fffdf8', 'accent': '#8a2b21',
+      'ink': '#1c1a16', 'paper': '#ffffff', 'accent': '#8a2b21',
       'muted': '#6f685c', 'rule': '#e7e1d4', 'code-bg': '#f4f0e7',
-    },
-  },
-  {
-    id: 'technical', name: 'Technical', note: 'Mono headings',
-    vars: {
-      'font-body': PLEX, 'font-head': MONO, 'font-mono': MONO,
-      'fs-base': '15px', 'lh': '1.6', 'scale': '1.17', 'para': '0.85em',
-      'page-pad': '18mm', 'measure': 'none',
-      'ink': '#13161b', 'paper': '#ffffff', 'accent': '#0e8f6e',
-      'muted': '#5b6470', 'rule': '#e1e6ea', 'code-bg': '#f4f7f9',
     },
   },
   {
@@ -75,16 +63,6 @@ window.THEMES = [
       'page-pad': '22mm', 'measure': 'none',
       'ink': '#1a1613', 'paper': '#ffffff', 'accent': '#b8402a',
       'muted': '#7d7368', 'rule': '#eae3da', 'code-bg': '#f6f1ec',
-    },
-  },
-  {
-    id: 'minimal', name: 'Minimal', note: 'Whitespace heavy',
-    vars: {
-      'font-body': SANS, 'font-head': SANS, 'font-mono': MONO,
-      'fs-base': '15px', 'lh': '1.85', 'scale': '1.2', 'para': '1.1em',
-      'page-pad': '30mm', 'measure': '60ch',
-      'ink': '#2a2a2a', 'paper': '#ffffff', 'accent': '#2a2a2a',
-      'muted': '#a0a0a0', 'rule': '#eeeeee', 'code-bg': '#f7f7f7',
     },
   },
   {
@@ -111,7 +89,7 @@ window.LEVELS = [
 /* The CSS-variable keys a given level owns (used by cells + doc.css). */
 window.levelKeys = function (lvl) {
   if (lvl === 'p') {
-    return { font: 'font-body', size: 'fs-base', weight: 'body-weight', lh: 'lh', track: 'body-track', spaceA: 'para-above', spaceB: 'para', case: 'body-case' };
+    return { font: 'font-body', size: 'fs-base', weight: 'body-weight', lh: 'lh', track: 'body-track', spaceA: 'para-above', spaceB: 'para', case: 'body-case', bar: 'body-bar' };
   }
   return { font: lvl + '-font', size: lvl + '-size', weight: lvl + '-weight', lh: lvl + '-lh', track: lvl + '-track', spaceA: lvl + '-space', spaceB: lvl + '-space-below', case: lvl + '-case', bar: lvl + '-bar' };
 };
@@ -134,11 +112,11 @@ window.expandTheme = function (v) {
   const out = {
     'font-mono': v['font-mono'],
     'pad-y': v['pad-y'] || v['page-pad'] || '20mm', 'pad-x': v['pad-x'] || v['page-pad'] || '20mm', 'measure': v['measure'] || 'none',
-    'ink': v['ink'], 'paper': v['paper'], 'accent': v['accent'],
+    'ink': v['ink'], 'paper': '#ffffff', 'accent': v['accent'],
     'muted': v['muted'], 'rule': v['rule'], 'code-bg': v['code-bg'],
     'lh': v['lh'] || '1.6', 'para': v['para'] || '0.9em', 'para-above': v['para-above'] || '0em',
     'font-body': v['font-body'], 'fs-base': px(base),
-    'body-weight': '400', 'body-track': '0em', 'body-case': 'none',
+    'body-weight': '400', 'body-track': '0em', 'body-case': 'none', 'body-bar': v['body-bar'] || '0',
     'bq-border': v['bq-border'] || v['accent'], 'bq-border-w': v['bq-border-w'] || '3px',
     'bq-color': v['bq-color'] || v['muted'], 'bq-style': v['bq-style'] || 'italic',
     'link-color': v['link-color'] || v['accent'], 'link-deco': v['link-deco'] || 'none',
@@ -163,7 +141,7 @@ window.expandTheme = function (v) {
 
 /* Ordered key list for the theme-CSS preview / copy */
 window.CSS_ORDER = [
-  'font-body', 'fs-base', 'lh', 'para-above', 'para', 'body-weight', 'body-track', 'body-case',
+  'font-body', 'fs-base', 'lh', 'para-above', 'para', 'body-weight', 'body-track', 'body-case', 'body-bar',
   'h1-font', 'h1-size', 'h1-weight', 'h1-lh', 'h1-track', 'h1-space', 'h1-space-below', 'h1-case', 'h1-bar',
   'h2-font', 'h2-size', 'h2-weight', 'h2-lh', 'h2-track', 'h2-space', 'h2-space-below', 'h2-case', 'h2-bar',
   'h3-font', 'h3-size', 'h3-weight', 'h3-lh', 'h3-track', 'h3-space', 'h3-space-below', 'h3-case', 'h3-bar',

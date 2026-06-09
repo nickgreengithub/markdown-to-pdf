@@ -1,22 +1,29 @@
-/* global React, ReactDOM, marked, hljs, TurndownService, turndownPluginGfm, JSZip, THEMES, FONTS, SAMPLE_MD, LEVELS, levelKeys, expandTheme, getTheme, CSS_ORDER */
+/* global React, ReactDOM, marked, hljs, TurndownService, turndownPluginGfm, THEMES, FONTS, SAMPLE_MD, LEVELS, levelKeys, expandTheme, getTheme, CSS_ORDER */
 const { useState, useEffect, useRef, useCallback, forwardRef, memo } = React;
 
-const LS = { html: 'mdv3.html', title: 'mdv2.title', theme: 'mdv2.theme', vars: 'mdv2.vars', zoom: 'mdv2.zoom2', rawZoom: 'mdv2.rawZoom', open: 'mdv2.open', side: 'mdv2.side' };
+const LS = { html: 'mdv4.html', theme: 'mdv2.theme', vars: 'mdv2.vars', zoom: 'mdv2.zoom3', rawZoom: 'mdv2.rawZoom2', open: 'mdv2.open', side: 'mdv2.side', seed: 'mdv.seed' };
 const get = (k, f) => { try { const v = localStorage.getItem(k); return v == null ? f : v; } catch { return f; } };
 const getJSON = (k, f) => { try { const v = localStorage.getItem(k); return v == null ? f : JSON.parse(v); } catch { return f; } };
 const set = (k, v) => { try { localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v)); } catch {} };
 
+/* One-time seed: clear any previously saved document so the bundled sample shows.
+   Bump SEED_VERSION whenever the default sample should be re-seeded. */
+const SEED_VERSION = 'hyperloop-2';
+(function seedSampleOnce() {
+  try {
+    if (get(LS.seed, null) !== SEED_VERSION) {
+      localStorage.removeItem(LS.html);
+      localStorage.removeItem('mdv2.title');
+      set(LS.seed, SEED_VERSION);
+    }
+  } catch {}
+})();
+
 const getTheme = (id) => THEMES.find((t) => t.id === id) || THEMES[0];
-const cssLines = (v) => CSS_ORDER.filter((k) => v[k] != null).map((k) => `  --${k}: ${v[k]};`).join('\n');
-const themeCSS = (v) => `:root {\n${cssLines(v)}\n}`;
 const escHTML = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const highlightCSS = (css) => escHTML(css)
-  .replace(/(--[\w-]+)(:)/g, '<span class="pp">$1</span>$2')
-  .replace(/(: )([^;\n]+)(;)/g, '$1<span class="pv">$2</span>$3');
 
 const COLOR_SETS = {
   ink:    ['#1b1d22', '#13161b', '#2a2a2a', '#1c1a16', '#22303a', '#102a43'],
-  paper:  ['#ffffff', '#fffdf8', '#fcfbf9', '#f7f9fc'],
   accent: ['#2f64e6', '#0e8f6e', '#b8402a', '#8a2b21', '#6d4bd0', '#444444'],
   muted:  ['#6b7280', '#7d7368', '#9a9a9a', '#5b6470', '#8a8f98', '#a89f92'],
   rule:   ['#e6e8ec', '#eae3da', '#e1e6ea', '#dfe2e5', '#d8dde3', '#cdd3da'],
@@ -83,85 +90,60 @@ function htmlToMD(html) {
   }
   return _td.turndown(html || '');
 }
-const slug = (s) => (String(s || '').trim() || 'document').replace(/[\\/:*?"<>|]+/g, '').slice(0, 80) || 'document';
-const FONTS_HREF = 'https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,300..700;1,400..600&family=Libre+Franklin:wght@400..700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&family=Source+Serif+4:ital,opsz,wght@0,8..60,400..700;1,8..60,400..600&family=Spectral:ital,wght@0,400;0,500;0,600;1,400&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400..500&display=swap';
-function downloadText(name, text, mime) {
-  downloadBlob(name, new Blob([text], { type: mime }));
+
+/* ----- paste: always adopt page styling, never foreign HTML/CSS -------- */
+const looksLikeMarkdown = (text) => {
+  const t = String(text || '').trim();
+  if (t.length < 2) return false;
+  return /^#{1,6}\s/m.test(t) || /^```/m.test(t) || /^>\s/m.test(t)
+    || /^\s*[-*+]\s/m.test(t) || /^\s*\d+\.\s/m.test(t) || /^\|.+\|/m.test(t)
+    || /\[.+?\]\(.+?\)/.test(t) || /^---\s*$/m.test(t);
+};
+const htmlLooksStyled = (html) => /background(-color)?\s*:|hljs|monaco|class="[^"]*(?:highlight|token|cm-|language-)/i.test(html)
+  || /<(?:pre|code|div|span)[^>]+style/i.test(html);
+const ALLOWED_TAGS = new Set(['H1','H2','H3','H4','H5','H6','P','BR','UL','OL','LI','BLOCKQUOTE','PRE','CODE','TABLE','THEAD','TBODY','TR','TH','TD','A','STRONG','B','EM','I','S','DEL','HR','IMG','SUP','SUB']);
+function unwrapNode(node) {
+  const parent = node.parentNode;
+  if (!parent) return;
+  while (node.firstChild) parent.insertBefore(node.firstChild, node);
+  parent.removeChild(node);
 }
-function downloadBlob(name, blob) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = name; a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+function flattenPre(pre, doc) {
+  const text = (pre.textContent || '').replace(/\n$/, '');
+  pre.innerHTML = '';
+  const code = doc.createElement('code');
+  code.textContent = text;
+  pre.appendChild(code);
 }
-const MIME_EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp', 'image/svg+xml': 'svg', 'image/bmp': 'bmp' };
-const EXT_MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml', bmp: 'image/bmp' };
-function dataUriToBytes(uri) {
-  const comma = uri.indexOf(',');
-  const meta = uri.slice(5, comma);
-  const mime = (meta.split(';')[0] || 'image/png').toLowerCase();
-  const bin = atob(uri.slice(comma + 1));
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return { bytes, mime };
+function sanitizePastedHTML(html) {
+  const doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
+  doc.body.querySelectorAll('script, style, meta, link, head').forEach((n) => n.remove());
+  const clean = (node) => {
+    [...node.childNodes].forEach((child) => {
+      if (child.nodeType !== 1) return;
+      const tag = child.tagName;
+      if (tag === 'SPAN' || tag === 'FONT' || !ALLOWED_TAGS.has(tag)) { unwrapNode(child); clean(node); return; }
+      if (tag === 'DIV') { unwrapNode(child); clean(node); return; }
+      [...child.attributes].forEach((a) => {
+        if (tag === 'A' && a.name === 'href') return;
+        if (tag === 'IMG' && (a.name === 'src' || a.name === 'alt')) return;
+        child.removeAttribute(a.name);
+      });
+      if (tag === 'PRE') flattenPre(child, doc);
+      clean(child);
+    });
+  };
+  clean(doc.body);
+  return reflowHTML(doc.body.innerHTML);
+}
+function pasteToHTML(plain, html) {
+  if (plain && (looksLikeMarkdown(plain) || (html && htmlLooksStyled(html))))
+    return reflowHTML(mdFileToHTML(plain));
+  if (html) return sanitizePastedHTML(html);
+  return reflowHTML(mdToHTML(plain));
 }
 
-/* Compact sample exercising every component, for the theme dialog preview */
-const THEME_SAMPLE = `# Heading One
-Body copy with **bold**, *italic*, a [link](#), and \`inline code\` to show tone.
-
-## Heading Two
-> A blockquote demonstrates the accent rule and muted text color.
-
-- First bullet item
-- Second bullet item
-
-1. Ordered item one
-2. Ordered item two
-
-### Heading Three
-
-\`\`\`js
-function demo(x) { return x * 2; }
-\`\`\`
-
-| Column A | Column B |
-|----------|----------|
-| One      | Two      |
-| Three    | Four     |
-
-#### Heading Four
-A final line of body text, followed by a horizontal rule.
-
----
-`;
-const themeSampleHTML = () => (window.marked ? marked.parse(THEME_SAMPLE) : THEME_SAMPLE);
-
-const GearIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="3" />
-    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-  </svg>
-);
 const ICON = { w: 17, h: 17, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' };
-const OpenIcon = () => (
-  <svg width={ICON.w} height={ICON.h} viewBox={ICON.viewBox} fill={ICON.fill} stroke={ICON.stroke} strokeWidth={ICON.strokeWidth} strokeLinecap={ICON.strokeLinecap} strokeLinejoin={ICON.strokeLinejoin}>
-    <path d="M21 11.5V8a2 2 0 0 0-2-2h-6.5l-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h7" />
-    <path d="M12 15h9" /><path d="m18 12 3 3-3 3" />
-  </svg>
-);
-const SaveIcon = () => (
-  <svg width={ICON.w} height={ICON.h} viewBox={ICON.viewBox} fill={ICON.fill} stroke={ICON.stroke} strokeWidth={ICON.strokeWidth} strokeLinecap={ICON.strokeLinecap} strokeLinejoin={ICON.strokeLinejoin}>
-    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-    <path d="M17 21v-8H7v8" /><path d="M7 3v5h8" />
-  </svg>
-);
-const ExportIcon = () => (
-  <svg width={ICON.w} height={ICON.h} viewBox={ICON.viewBox} fill={ICON.fill} stroke={ICON.stroke} strokeWidth={ICON.strokeWidth} strokeLinecap={ICON.strokeLinecap} strokeLinejoin={ICON.strokeLinejoin}>
-    <path d="M12 3v12" /><path d="m8 11 4 4 4-4" />
-    <path d="M5 21h14a2 2 0 0 0 2-2v-3" /><path d="M3 16v3a2 2 0 0 0 2 2" />
-  </svg>
-);
 const PrintIcon = () => (
   <svg width={ICON.w} height={ICON.h} viewBox={ICON.viewBox} fill={ICON.fill} stroke={ICON.stroke} strokeWidth={ICON.strokeWidth} strokeLinecap={ICON.strokeLinecap} strokeLinejoin={ICON.strokeLinejoin}>
     <path d="M6 9V3h12v6" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
@@ -173,6 +155,20 @@ const ChevLeft = () => (
 );
 const ChevRight = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+);
+const MarkdownIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2.5" y="6" width="19" height="12" rx="2.4" />
+    <path d="M6 15V9l2.6 2.8L11.2 9v6" />
+    <path d="M16.4 9v6M16.4 15l-1.9-2.1M16.4 15l1.9-2.1" />
+  </svg>
+);
+const DocumentIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+    <path d="M14 3v5h5" />
+    <path d="M9 13h6M9 17h6" />
+  </svg>
 );
 
 /* ============================ Editable A4 surface ============================
@@ -288,12 +284,9 @@ const EditorSurface = memo(forwardRef(function EditorSurface({ bus }, ref) {
       el.innerHTML = reflowHTML(stored);
       highlight(); bus.current.report(el); relayout();
     } else {
-      // first run (or after a cache reset): start from the bundled Report.md
+      // first run (or after a cache reset): start from the bundled sample report
       el.innerHTML = mdToHTML(SAMPLE_MD);
       highlight(); bus.current.report(el); relayout();
-      fetch('Report.md').then((r) => { if (!r.ok) throw 0; return r.text(); })
-        .then((md) => { bus.current.setDoc(mdFileToHTML(md)); })
-        .catch(() => {});
     }
     const ro = new ResizeObserver(() => recompute());
     ro.observe(el); ro.observe(pageEl);
@@ -317,7 +310,9 @@ const EditorSurface = memo(forwardRef(function EditorSurface({ bus }, ref) {
       return true;
     };
     const onPaste = (e) => {
-      const items = (e.clipboardData && e.clipboardData.items) || [];
+      const cd = e.clipboardData;
+      if (!cd) return;
+      const items = cd.items || [];
       for (const it of items) {
         if (it.type && it.type.indexOf('image/') === 0) {
           const file = it.getAsFile();
@@ -329,6 +324,17 @@ const EditorSurface = memo(forwardRef(function EditorSurface({ bus }, ref) {
           return;
         }
       }
+      const plain = cd.getData('text/plain') || '';
+      const html = cd.getData('text/html') || '';
+      if (!plain && !html) return;
+      e.preventDefault();
+      const insert = pasteToHTML(plain, html);
+      el.focus();
+      document.execCommand('insertHTML', false, insert);
+      if (window.hljs) el.querySelectorAll('pre code').forEach((c) => { try { hljs.highlightElement(c); } catch {} });
+      set(LS.html, cleanedHTML());
+      bus.current.report(el);
+      relayout();
     };
     el.addEventListener('paste', onPaste);
     bus.current.focus = () => el.focus();
@@ -420,21 +426,6 @@ function Seg({ value, options, onChange }) {
     </div>
   );
 }
-function Stepper({ label, value, unit, step, min, max, onChange }) {
-  const n = parseFloat(value);
-  const cur = Number.isFinite(n) ? n : 0;
-  const set = (nv) => onChange(Math.max(min, Math.min(max, Math.round(nv * 10) / 10)) + (unit || ''));
-  return (
-    <div className="stepper">
-      <span className="stepper-label">{label}</span>
-      <div className="stepper-ctl">
-        <button onClick={() => set(cur - step)} title="Decrease">−</button>
-        <span className="sv">{cur}{unit}</span>
-        <button onClick={() => set(cur + step)} title="Increase">+</button>
-      </div>
-    </div>
-  );
-}
 function Chips({ value, options, onChange, disabled }) {
   const cur = (value || '').toLowerCase();
   return (
@@ -447,59 +438,45 @@ function Chips({ value, options, onChange, disabled }) {
   );
 }
 
-/* ===================== Theme dialog ===================== */
-function ThemeModal({ open, currentId, onApply, onClose }) {
-  const [sel, setSel] = useState(currentId);
-  const [tab, setTab] = useState('preview');
-  useEffect(() => { if (open) { setSel(currentId); setTab('preview'); } }, [open, currentId]);
-  if (!open) return null;
-  const theme = getTheme(sel);
-  const expanded = expandTheme(theme.vars);
-  const css = themeCSS(expanded);
-  const previewStyle = { background: expanded.paper, color: expanded.ink };
-  Object.keys(expanded).forEach((k) => { previewStyle['--' + k] = expanded[k]; });
+/* ===================== Theme picker (hover dropdown) ===================== */
+function ThemeMenu({ currentId, onApply }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const closeT = useRef(null);
+  const cancelClose = () => { if (closeT.current) { clearTimeout(closeT.current); closeT.current = null; } };
+  const openNow = () => { cancelClose(); setOpen(true); };
+  const closeSoon = () => { cancelClose(); closeT.current = setTimeout(() => setOpen(false), 180); };
+  useEffect(() => () => cancelClose(), []);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [open]);
+  const cur = getTheme(currentId);
   return (
-    <div className="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="modal">
-        <div className="modal-head">
-          <b>Themes</b><span className="sub">· {THEMES.length} presets</span>
-          <button className="x" onClick={onClose} title="Close">✕</button>
-        </div>
-        <div className="modal-body">
-          <div className="tlist">
+    <div className="tsel" ref={ref} onMouseEnter={openNow} onMouseLeave={closeSoon}>
+      <button className={'tsel-btn' + (open ? ' open' : '')} onClick={() => (open ? setOpen(false) : openNow())}>
+        <span>{cur.name}</span>
+        <span className="tsel-chev">▾</span>
+      </button>
+      {open && (
+        <div className="tsel-pop">
+          <div className="tsel-group">
+            <div className="tsel-glabel">Themes</div>
             {THEMES.map((t) => (
-              <button key={t.id} className={'trow' + (t.id === sel ? ' sel' : '')}
-                onClick={() => setSel(t.id)} onDoubleClick={() => { onApply(t); onClose(); }}>
-                <span className="aa" style={{ background: t.vars.paper, color: t.vars.ink, fontFamily: t.vars['font-head'] }}>Aa</span>
-                <span className="tt"><span className="n">{t.name}</span></span>
-                {t.id === currentId && <span className="cur">CURRENT</span>}
+              <button key={t.id} className={'tsel-item' + (t.id === currentId ? ' sel' : '')}
+                onClick={() => { onApply(t); setOpen(false); }}>
+                <span className="tsel-aa" style={{ background: t.vars.paper, color: t.vars.ink, fontFamily: t.vars['font-head'] }}>Aa</span>
+                <span className="tsel-name">{t.name}</span>
+                {t.id === currentId && <span className="tsel-cur">current</span>}
               </button>
             ))}
           </div>
-          <div className="tpane">
-            <div className="tpane-bar">
-              <div className="tabs">
-                <button className={tab === 'preview' ? 'sel' : ''} onClick={() => setTab('preview')}>Preview</button>
-                <button className={tab === 'css' ? 'sel' : ''} onClick={() => setTab('css')}>CSS</button>
-              </div>
-              <div className="bar-right">
-                <span className="nm">{theme.name}</span>
-                {tab === 'css' && (
-                  <button className="btn ghost" style={{ height: 28 }} onClick={() => { try { navigator.clipboard.writeText(css); } catch {} }}>Copy CSS</button>
-                )}
-              </div>
-            </div>
-            {tab === 'preview'
-              ? <div className="tpreview" style={previewStyle}><div className="doc" dangerouslySetInnerHTML={{ __html: themeSampleHTML() }} /></div>
-              : <pre className="tcss-pre" dangerouslySetInnerHTML={{ __html: highlightCSS(css) }} />}
-          </div>
         </div>
-        <div className="modal-foot">
-          <span className="spacer" />
-          <button className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn primary" onClick={() => { onApply(theme); onClose(); }}>Apply theme</button>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -794,18 +771,10 @@ function rawActive(ta) {
   return set;
 }
 
-function FormatBar({ exec, active, onOpen, onSave, onExport, onPrint, disabled, title, setTitle }) {
+function FormatBar({ exec, active, onPrint, disabled }) {
   const on = (t) => active && active.has(toolKey(t));
   return (
     <div className="format-bar">
-      <div className="fb-left">
-        <button className="fmt" title="Open .md / .zip  (⌘O)" onClick={onOpen}><OpenIcon /></button>
-        <label className="fb-titlebox" title="Document title (used as file name)">
-          <input className="fb-title" size={Math.max((title || '').length, 4)} value={title}
-            onChange={(e) => setTitle(e.target.value)} placeholder="Untitled" />
-          <span className="fb-ext">.md</span>
-        </label>
-      </div>
       <div className={'fb-center' + (disabled ? ' is-disabled' : '')}>
         {TOOL.map((t, i) => t.sep
           ? <span key={i} className="fmt-sep" />
@@ -815,8 +784,6 @@ function FormatBar({ exec, active, onOpen, onSave, onExport, onPrint, disabled, 
             </button>)}
       </div>
       <div className="fb-right">
-        <button className="fmt" title="Save .md  (⌘S)" onClick={onSave}><SaveIcon /></button>
-        <button className="fmt" title="Export HTML" onClick={onExport}><ExportIcon /></button>
         <button className="fmt primary-fmt" title="Print / PDF  (⌘P)" onClick={onPrint}><PrintIcon /></button>
       </div>
     </div>
@@ -878,7 +845,7 @@ function MarkdownGuide() {
 }
 
 /* ============================ App ============================ */
-const FOOT_LABEL = { raw: 'RAW MARKDOWN', css: 'THEME CSS' };
+const FOOT_LABEL = { raw: 'MARKDOWN' };
 const TARGET_LABEL = {
   h1: 'Heading 1', h2: 'Heading 2', h3: 'Heading 3', h4: 'Heading 4', p: 'Body text',
   quote: 'Blockquote', link: 'Link', list: 'List', table: 'Table', image: 'Image',
@@ -944,6 +911,80 @@ function TargetMenu({ value, current, vars, onChange, numLabel }) {
   );
 }
 
+/* small monochrome glyphs that prefix each inspector row label */
+const PARAM_ICONS = {
+  font: <><path d="M4 19 10 5h1.6L18 19" /><path d="M6.4 14h8.2" /></>,
+  size: <><path d="M3 18 6.5 9 10 18" /><path d="M4 15.2h5" /><path d="M14.5 18 17 11.5 19.5 18" /><path d="M15.4 16h3.2" /></>,
+  weight: <path d="M7 5h6a3 3 0 0 1 0 6H7zM7 11h7a3 3 0 0 1 0 6H7z" />,
+  lh: <><path d="M10 6h10M10 12h10M10 18h10" /><path d="M4 5v14" /><path d="m2.4 7 1.6-2 1.6 2" /><path d="m2.4 17 1.6 2 1.6-2" /></>,
+  letter: <><path d="M5 5v14M19 5v14" /><path d="M9 12h6" /><path d="m9 12 2-2M9 12l2 2" /><path d="m15 12-2-2M15 12l2 2" /></>,
+  spaceA: <><path d="M4 4h16" /><path d="M12 7v4" /><path d="m9.5 9 2.5 2.5L14.5 9" /><rect x="6" y="14" width="12" height="6" rx="1.2" /></>,
+  spaceB: <><rect x="6" y="4" width="12" height="6" rx="1.2" /><path d="M12 13v4" /><path d="m9.5 15 2.5 2.5 2.5-2.5" /><path d="M4 20h16" /></>,
+  case: <><path d="M3 18 6 9l3 9" /><path d="M4 15h4" /><circle cx="16" cy="14.5" r="3.3" /><path d="M19.3 11.2v6.3" /></>,
+  bar: <><path d="M6.5 13 9.5 6l3 7" /><path d="M7.6 11h3.8" /><path d="M4 19h16" strokeWidth="2.6" /></>,
+  italic: <path d="M10 5h6M8 19h6M14.5 5 9.5 19" />,
+  underline: <><path d="M7 5v6a5 5 0 0 0 10 0V5" /><path d="M6 20h12" /></>,
+  color: <path d="M12 3.5c3.5 4 5.5 6.7 5.5 9.5a5.5 5.5 0 0 1-11 0c0-2.8 2-5.5 5.5-9.5z" />,
+  border: <rect x="4.5" y="4.5" width="15" height="15" rx="2" />,
+  borderw: <><path d="M4 8h16" strokeWidth="1.1" /><path d="M4 15h16" strokeWidth="3.4" /></>,
+  marker: <><circle cx="6" cy="12" r="2.3" fill="currentColor" stroke="none" /><path d="M11 12h9" /></>,
+  gap: <><path d="M9 7h11M9 17h11" /><circle cx="5" cy="7" r="1.5" fill="currentColor" stroke="none" /><circle cx="5" cy="17" r="1.5" fill="currentColor" stroke="none" /><path d="M5 10.5v3" /></>,
+  indent: <><path d="M10 6h10M10 12h10M10 18h10" /><path d="m4 9 3 3-3 3z" fill="currentColor" stroke="none" /></>,
+  fill: <><rect x="4" y="5" width="16" height="14" rx="1.5" /><path d="M4 10h16" /><rect x="5" y="6" width="14" height="3.4" fill="currentColor" stroke="none" opacity=".3" /></>,
+  padY: <><rect x="4" y="5" width="16" height="14" rx="1.5" /><path d="M12 7.5v3M12 13.5v3" /></>,
+  padX: <><rect x="4" y="5" width="16" height="14" rx="1.5" /><path d="M7.5 12h3M13.5 12h3" /></>,
+  width: <><rect x="3" y="6" width="18" height="12" rx="2" /><path d="M8 12h8" /><path d="m8 12 2-2M8 12l2 2" /><path d="m16 12-2-2M16 12l2 2" /></>,
+  align: <path d="M5 6h14M5 12h9M5 18h14" />,
+};
+function RowIcon({ name }) {
+  const inner = PARAM_ICONS[name];
+  if (!inner) return null;
+  return (
+    <svg className="ir-ic" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{inner}</svg>
+  );
+}
+
+/* font picker — hover dropdown that previews each face in its own typeface */
+function FontMenu({ value, onChange, disabled }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const closeT = useRef(null);
+  const cancelClose = () => { if (closeT.current) { clearTimeout(closeT.current); closeT.current = null; } };
+  const openNow = () => { if (disabled) return; cancelClose(); setOpen(true); };
+  const closeSoon = () => { cancelClose(); closeT.current = setTimeout(() => setOpen(false), 180); };
+  useEffect(() => () => cancelClose(), []);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [open]);
+  const cur = FONTS.find((f) => f.stack === value);
+  return (
+    <div className={'tsel tsel-font' + (disabled ? ' is-disabled' : '')} ref={ref} onMouseEnter={openNow} onMouseLeave={closeSoon}>
+      <button className={'tsel-btn' + (open ? ' open' : '')} disabled={disabled} onClick={() => (open ? setOpen(false) : openNow())}>
+        <span style={{ fontFamily: disabled ? undefined : value }}>{disabled ? '—' : (cur ? cur.label : 'Font')}</span>
+        <span className="tsel-chev">▾</span>
+      </button>
+      {open && (
+        <div className="tsel-pop">
+          <div className="tsel-group">
+            {FONTS.map((f) => (
+              <button key={f.label} className={'tsel-item' + (f.stack === value ? ' sel' : '')}
+                onClick={() => { onChange(f.stack); setOpen(false); }}>
+                <span className="tsel-name" style={{ fontFamily: f.stack, fontSize: '14px' }}>{f.label}</span>
+                {f.stack === value && <span className="tsel-cur">current</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* The unified, single-row style inspector. Every target shows the same row
    set; controls that don't apply to the current target are disabled. */
 function inspectorRows(target) {
@@ -951,8 +992,8 @@ function inspectorRows(target) {
   // pad with empty rows so the inspector keeps the same height as every other style.
   if (target === 'image') {
     const rows = [
-      { label: 'Width', type: 'imgwidth', v: 'img', opts: [['50%', '\u00bd'], ['75%', '\u00be'], ['100%', 'Full']] },
-      { label: 'Align', type: 'imgalign', v: 'img', opts: [['left', '\u2190'], ['center', '\u2194'], ['right', '\u2192']] },
+      { label: 'Width', icon: 'width', type: 'imgwidth', v: 'img', opts: [['50%', '\u00bd'], ['75%', '\u00be'], ['100%', 'Full']] },
+      { label: 'Align', icon: 'align', type: 'imgalign', v: 'img', opts: [['left', '\u2190'], ['center', '\u2194'], ['right', '\u2192']] },
     ];
     const std = inspectorRows('p').length;
     let n = 0;
@@ -961,28 +1002,27 @@ function inspectorRows(target) {
   }
   const lvl = /^(h[1-4]|p)$/.test(target);
   const k = lvl ? levelKeys(target) : {};
-  const heading = /^h[1-4]$/.test(target);
   return [
-    { label: 'Font',        type: 'font',  v: lvl ? k.font : null },
-    { label: 'Size',        type: 'step',  v: lvl ? k.size : null, unit: 'px', step: 0.5, min: 6 },
-    { label: 'Weight',      type: 'step',  v: lvl ? k.weight : null, step: 50, min: 100, max: 900 },
-    { label: 'Line height', type: 'step',  v: lvl ? k.lh : null, step: 0.02, min: 0.8 },
-    { label: 'Letter',      type: 'step',  v: lvl ? k.track : null, unit: 'em', step: 0.005 },
-    { label: 'Space above', type: 'step',  v: lvl ? k.spaceA : null, unit: 'em', step: 0.05, min: 0 },
-    { label: 'Space below', type: 'step',  v: lvl ? k.spaceB : null, unit: 'em', step: 0.05, min: 0 },
-    { label: 'Case',        type: 'case',  v: lvl ? k.case : null },
-    { label: 'Under-bar',   type: 'toggle', v: heading ? k.bar : null, on: '1', off: '0' },
-    { label: 'Italic',      type: 'toggle', v: target === 'quote' ? 'bq-style' : null, on: 'italic', off: 'normal' },
-    { label: 'Underline',   type: 'toggle', v: target === 'link' ? 'link-deco' : null, on: 'underline', off: 'none' },
-    { label: 'Text color',  type: 'color', v: target === 'quote' ? 'bq-color' : target === 'link' ? 'link-color' : null, opts: target === 'link' ? 'accent' : 'muted' },
-    { label: 'Border color',type: 'color', v: target === 'quote' ? 'bq-border' : target === 'table' ? 'tbl-border' : null, opts: target === 'table' ? 'rule' : 'accent' },
-    { label: 'Border width',type: 'step',  v: target === 'quote' ? 'bq-border-w' : null, unit: 'px', step: 1, min: 0, max: 12 },
-    { label: 'Marker color',type: 'color', v: target === 'list' ? 'list-marker' : null, opts: 'muted' },
-    { label: 'Item spacing',type: 'step',  v: target === 'list' ? 'list-gap' : null, unit: 'em', step: 0.05, min: 0 },
-    { label: 'Indent',      type: 'step',  v: target === 'list' ? 'list-indent' : null, unit: 'em', step: 0.1, min: 0 },
-    { label: 'Header fill', type: 'color', v: target === 'table' ? 'tbl-head-bg' : null, opts: 'codebg' },
-    { label: 'Cell pad \u2195', type: 'step', v: target === 'table' ? 'tbl-pad-y' : null, unit: 'em', step: 0.05, min: 0 },
-    { label: 'Cell pad \u2194', type: 'step', v: target === 'table' ? 'tbl-pad-x' : null, unit: 'em', step: 0.05, min: 0 },
+    { label: 'Font',        icon: 'font',   type: 'font',  v: lvl ? k.font : null },
+    { label: 'Size',        icon: 'size',   type: 'step',  v: lvl ? k.size : null, unit: 'px', step: 0.5, min: 6 },
+    { label: 'Weight',      icon: 'weight', type: 'step',  v: lvl ? k.weight : null, step: 50, min: 100, max: 900 },
+    { label: 'Line height', icon: 'lh',     type: 'step',  v: lvl ? k.lh : null, step: 0.02, min: 0.8 },
+    { label: 'Letter',      icon: 'letter', type: 'step',  v: lvl ? k.track : null, unit: 'em', step: 0.005 },
+    { label: 'Space above', icon: 'spaceA', type: 'step',  v: lvl ? k.spaceA : null, unit: 'em', step: 0.05, min: 0 },
+    { label: 'Space below', icon: 'spaceB', type: 'step',  v: lvl ? k.spaceB : null, unit: 'em', step: 0.05, min: 0 },
+    { label: 'Case',        icon: 'case',   type: 'case',  v: lvl ? k.case : null },
+    { label: 'Under-bar',   icon: 'bar',    type: 'toggle', v: lvl ? k.bar : null, on: '1', off: '0' },
+    { label: 'Italic',      icon: 'italic', type: 'toggle', v: target === 'quote' ? 'bq-style' : null, on: 'italic', off: 'normal' },
+    { label: 'Underline',   icon: 'underline', type: 'toggle', v: target === 'link' ? 'link-deco' : null, on: 'underline', off: 'none' },
+    { label: 'Text color',  icon: 'color',  type: 'color', v: target === 'quote' ? 'bq-color' : target === 'link' ? 'link-color' : null, opts: target === 'link' ? 'accent' : 'muted' },
+    { label: 'Border color',icon: 'border', type: 'color', v: target === 'quote' ? 'bq-border' : target === 'table' ? 'tbl-border' : null, opts: target === 'table' ? 'rule' : 'accent' },
+    { label: 'Border width',icon: 'borderw',type: 'step',  v: target === 'quote' ? 'bq-border-w' : null, unit: 'px', step: 1, min: 0, max: 12 },
+    { label: 'Marker color',icon: 'marker', type: 'color', v: target === 'list' ? 'list-marker' : null, opts: 'muted' },
+    { label: 'Item spacing',icon: 'gap',    type: 'step',  v: target === 'list' ? 'list-gap' : null, unit: 'em', step: 0.05, min: 0 },
+    { label: 'Indent',      icon: 'indent', type: 'step',  v: target === 'list' ? 'list-indent' : null, unit: 'em', step: 0.1, min: 0 },
+    { label: 'Header fill', icon: 'fill',   type: 'color', v: target === 'table' ? 'tbl-head-bg' : null, opts: 'codebg' },
+    { label: 'Cell pad \u2195', icon: 'padY', type: 'step', v: target === 'table' ? 'tbl-pad-y' : null, unit: 'em', step: 0.05, min: 0 },
+    { label: 'Cell pad \u2194', icon: 'padX', type: 'step', v: target === 'table' ? 'tbl-pad-x' : null, unit: 'em', step: 0.05, min: 0 },
   ];
 }
 function RowStep({ value, unit, step, min, max, disabled, onChange }) {
@@ -1024,12 +1064,7 @@ function RowControl({ row, vars, setVar, disabled, img }) {
     );
   }
   if (row.type === 'font')
-    return (
-      <select className="ir-font" disabled={disabled} value={disabled ? '' : (val || '')} onChange={(e) => setVar(v, e.target.value)}>
-        {disabled && <option value="">—</option>}
-        {FONTS.map((f) => <option key={f.label} value={f.stack}>{f.label}</option>)}
-      </select>
-    );
+    return <FontMenu value={val || ''} disabled={disabled} onChange={(stack) => setVar(v, stack)} />;
   if (row.type === 'step')
     return <RowStep value={val} unit={row.unit} step={row.step} min={row.min} max={row.max} disabled={disabled} onChange={(nv) => setVar(v, nv)} />;
   if (row.type === 'case') {
@@ -1052,7 +1087,7 @@ function Inspector({ target, vars, setVar, img }) {
         const off = !r.v;
         return (
           <div className={'irow' + (off ? ' off' : '') + (r.type === 'font' ? ' wide' : '') + (r.type === 'fill' ? ' fill' : '')} key={r._k || r.label}>
-            <span className="ir-label">{r.label}</span>
+            <span className="ir-label">{r.icon && <RowIcon name={r.icon} />}<span className="ir-lt">{r.label}</span></span>
             <div className="ir-ctl"><RowControl row={r} vars={vars} setVar={setVar} disabled={off} img={img} /></div>
           </div>
         );
@@ -1063,22 +1098,19 @@ function Inspector({ target, vars, setVar, img }) {
 
 function App() {
   const t0 = THEMES[0];
-  const [title, setTitle] = useState(() => get(LS.title, 'Untitled document'));
   const [themeId, setThemeId] = useState(() => get(LS.theme, t0.id));
   const [vars, setVars] = useState(() => {
     const persisted = getJSON(LS.vars, null);
     const base = expandTheme(getTheme(get(LS.theme, t0.id)).vars);
-    return persisted ? { ...base, ...persisted } : base;
+    return persisted ? { ...base, ...persisted, paper: '#ffffff' } : base;
   });
-  const [zoom, setZoom] = useState(() => parseFloat(get(LS.zoom, '1.3')) || 1.3);
-  const [rawZoom, setRawZoom] = useState(() => parseFloat(get(LS.rawZoom, '1.3')) || 1.3);
-  const [cssZoom, setCssZoom] = useState(1);
+  const [zoom, setZoom] = useState(() => parseFloat(get(LS.zoom, '1')) || 1);
+  const [rawZoom, setRawZoom] = useState(() => parseFloat(get(LS.rawZoom, '1')) || 1);
   const [openMap, setOpenMap] = useState(() => getJSON(LS.open, {}));
   const [sideOpen, setSideOpen] = useState(() => get(LS.side, '1') !== '0');
   const [stats, setStats] = useState({ words: 0, pages: 1 });
   const [toast, setToast] = useState('');
-  const [themeOpen, setThemeOpen] = useState(false);
-  const [view, setView] = useState('doc'); // 'doc' (WYSIWYG) | 'raw' (markdown source) | 'css' (theme CSS)
+  const [view, setView] = useState('doc'); // 'doc' (WYSIWYG) | 'raw' (markdown source)
   const [rawMd, setRawMd] = useState('');
   const [target, setTarget] = useState('h1'); // which style the inspector edits
   const [docStyle, setDocStyle] = useState(null); // style of the element under the caret/selection
@@ -1090,13 +1122,11 @@ function App() {
 
   const pageRef = useRef(null);
   const scrollRef = useRef(null);
-  const fileRef = useRef(null);
   const imgRef = useRef(null);
   const rawRef = useRef(null);
   const autoTargetRef = useRef('h1'); // last caret-derived target (for sticky manual picks)
   const bus = useRef({ report: () => {}, focus: () => {}, getDoc: () => '', setDoc: () => {}, insertImage: () => {} });
 
-  useEffect(() => { set(LS.title, title); }, [title]);
   useEffect(() => { set(LS.theme, themeId); }, [themeId]);
   useEffect(() => { set(LS.vars, vars); }, [vars]);
   useEffect(() => { set(LS.zoom, String(zoom)); }, [zoom]);
@@ -1216,119 +1246,20 @@ function App() {
     fr.readAsDataURL(file);
   };
 
-  /* ---- .md / .zip import ---- */
-  const importMd = (file) => {
-    if (!file) return;
-    const name = file.name.replace(/\.(md|markdown|txt|zip)$/i, '');
-    if (/\.zip$/i.test(file.name) && window.JSZip) {
-      const r = new FileReader();
-      r.onload = async () => {
-        try {
-          const zip = await JSZip.loadAsync(r.result);
-          const files = Object.values(zip.files).filter((f) => !f.dir);
-          const mdEntry = files.find((f) => /\.(md|markdown)$/i.test(f.name)) || files.find((f) => /\.txt$/i.test(f.name));
-          const md = mdEntry ? await mdEntry.async('string') : '';
-          const assets = files.filter((f) => /\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(f.name));
-          const map = {};
-          for (const a of assets) {
-            const b64 = await a.async('base64');
-            const ext = a.name.split('.').pop().toLowerCase();
-            map[a.name] = `data:${EXT_MIME[ext] || 'image/png'};base64,${b64}`;
-          }
-          const doc = new DOMParser().parseFromString(mdFileToHTML(md), 'text/html');
-          doc.querySelectorAll('img').forEach((img) => {
-            const src = decodeURIComponent((img.getAttribute('src') || '').replace(/^\.\//, ''));
-            const hit = map[src] || map[Object.keys(map).find((k) => k === src || k.endsWith('/' + src) || k.split('/').pop() === src.split('/').pop())];
-            if (hit) img.setAttribute('src', hit);
-          });
-          setView('doc'); bus.current.setDoc(doc.body.innerHTML); if (name) setTitle(name);
-          flash('Imported ' + file.name);
-        } catch (err) { flash('Could not read zip'); }
-      };
-      r.readAsArrayBuffer(file);
-      return;
-    }
-    const r = new FileReader();
-    r.onload = () => { setView('doc'); bus.current.setDoc(mdFileToHTML(String(r.result))); if (name) setTitle(name); flash('Imported ' + file.name); };
-    r.readAsText(file);
-  };
-  const onPickFile = (e) => { importMd(e.target.files[0]); e.target.value = ''; };
-
-  // collect data-URI images out of the doc HTML into zip assets, rewriting src to relative paths
-  const extractAssets = (html) => {
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    const assets = [];
-    let n = 0;
-    doc.querySelectorAll('img').forEach((img) => {
-      const src = img.getAttribute('src') || '';
-      if (/^data:/i.test(src)) {
-        try {
-          const { bytes, mime } = dataUriToBytes(src);
-          const path = `images/image-${++n}.${MIME_EXT[mime] || 'png'}`;
-          assets.push({ path, bytes });
-          img.setAttribute('src', path);
-        } catch {}
-      }
-    });
-    return { html: doc.body.innerHTML, assets };
-  };
-  const saveMd = async () => {
-    const baseHTML = view === 'raw' ? mdFileToHTML(rawMd) : bus.current.getDoc();
-    const { html, assets } = extractAssets(baseHTML);
-    const md = htmlToMD(html);
-    if (assets.length && window.JSZip) {
-      const zip = new JSZip();
-      zip.file(slug(title) + '.md', md);
-      assets.forEach((a) => zip.file(a.path, a.bytes));
-      const blob = await zip.generateAsync({ type: 'blob' });
-      downloadBlob(slug(title) + '.zip', blob);
-      flash(`Saved zip · ${assets.length} image${assets.length > 1 ? 's' : ''}`);
-    } else {
-      downloadText(slug(title) + '.md', md, 'text/markdown');
-      flash('Saved Markdown');
-    }
-  };
-  const saveRef = useRef(saveMd); saveRef.current = saveMd;
-
-  const exportHTML = async () => {
-    const docHTML = view === 'raw' ? mdFileToHTML(rawMd) : bus.current.getDoc();
-    let docCss = '';
-    try { docCss = await (await fetch('doc.css')).text(); } catch {}
-    const varCss = Object.keys(vars).map((k) => `--${k}: ${vars[k]};`).join(' ');
-    const html = `<!doctype html>
-<html lang="en"><head><meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>${escHTML(title || 'Document')}</title>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="${FONTS_HREF}" rel="stylesheet" />
-<style>
-${docCss}
-body { margin: 0; background: #fff; }
-.page { ${varCss} margin: 24px auto; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
-@media print { .page { margin: 0; box-shadow: none; } @page { size: A4; margin: 0; } }
-</style></head>
-<body><div class="page"><div class="doc">${docHTML}</div></div></body></html>`;
-    downloadText(slug(title) + '.html', html, 'text/html');
-    flash('Exported HTML');
-  };
-
-  // keyboard: Alt+1..6 themes, Cmd/Ctrl+P print, Cmd/Ctrl+O open, Cmd/Ctrl+S save .md
+  // keyboard: Alt+1..6 themes, Cmd/Ctrl+P print
   useEffect(() => {
     const onKey = (e) => {
       if (e.altKey && !e.metaKey && !e.ctrlKey && /^[1-6]$/.test(e.key)) { const t = THEMES[+e.key - 1]; if (t) { e.preventDefault(); applyTheme(t); } }
       const mod = e.metaKey || e.ctrlKey;
       if (mod && e.key.toLowerCase() === 'p') { e.preventDefault(); printRef.current(); }
-      if (mod && e.key.toLowerCase() === 'o') { e.preventDefault(); fileRef.current && fileRef.current.click(); }
-      if (mod && e.key.toLowerCase() === 's') { e.preventDefault(); saveRef.current(); }
     };
     window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const curZoom = view === 'raw' ? rawZoom : view === 'css' ? cssZoom : zoom;
+  const curZoom = view === 'raw' ? rawZoom : zoom;
   const nudge = (d) => {
     const apply = (z) => Math.max(0.4, Math.min(1.6, Math.round((z + d) * 100) / 100));
-    if (view === 'raw') setRawZoom(apply); else if (view === 'css') setCssZoom(apply); else setZoom(apply);
+    if (view === 'raw') setRawZoom(apply); else setZoom(apply);
   };
   const doPrint = () => {
     const html = view === 'raw' ? mdFileToHTML(rawMd) : bus.current.getDoc();
@@ -1358,16 +1289,14 @@ body { margin: 0; background: #fff; }
 
   return (
     <div className="app">
-      <input ref={fileRef} type="file" accept=".md,.markdown,.zip,text/markdown,text/plain" hidden onChange={onPickFile} />
       <input ref={imgRef} type="file" accept="image/*" hidden onChange={onPickImage} />
       <div className="workspace">
         <aside className={'sidebar' + (sideOpen ? '' : ' closed')}>
           <div className="side-top">
             <div className="side-views">
-              <div className="seg view3">
-                <button className={view === 'raw' ? 'sel' : ''} onClick={() => toView('raw')}>RAW</button>
-                <button className={view === 'css' ? 'sel' : ''} onClick={() => toView('css')}>CSS</button>
-                <button className={view === 'doc' ? 'sel' : ''} onClick={() => toView('doc')}>DOC</button>
+              <div className="seg view2">
+                <button className={view === 'raw' ? 'sel' : ''} onClick={() => toView('raw')}><MarkdownIcon /><span>Markdown</span></button>
+                <button className={view === 'doc' ? 'sel' : ''} onClick={() => toView('doc')}><DocumentIcon /><span>Document</span></button>
               </div>
               <button className="side-collapse" onClick={() => setSideOpen(false)} title="Collapse sidebar"><ChevLeft /></button>
             </div>
@@ -1379,10 +1308,7 @@ body { margin: 0; background: #fff; }
             ) : (
               <>
                 <Section id="theme" title="Theme" openMap={openMap} setOpenMap={setOpenMap}>
-                  <button className="theme-pick" onClick={() => setThemeOpen(true)} title="Choose / edit theme">
-                    <span className="nm">{getTheme(themeId).name}</span>
-                    <span className="ic"><GearIcon /></span>
-                  </button>
+                  <ThemeMenu currentId={themeId} onApply={applyTheme} />
                 </Section>
 
                 <Section title="Style">
@@ -1392,19 +1318,16 @@ body { margin: 0; background: #fff; }
                 </Section>
 
                 <Section id="page" title="Page" openMap={openMap} setOpenMap={setOpenMap}>
-                  <Field label="Paper"><Chips value={vars['paper']} options={COLOR_SETS.paper} onChange={(v) => setVar('paper', v)} /></Field>
-                  <Field label="Margins">
-                    <div className="margin-grid">
-                      <Stepper label="Height" value={vars['pad-y']} unit="mm" step={1} min={5} max={45} onChange={(v) => setVar('pad-y', v)} />
-                      <Stepper label="Width" value={vars['pad-x']} unit="mm" step={1} min={5} max={45} onChange={(v) => setVar('pad-x', v)} />
+                  <div className="insp">
+                    <div className="irow">
+                      <span className="ir-label"><RowIcon name="padY" /><span className="ir-lt">Margin height</span></span>
+                      <div className="ir-ctl"><RowStep value={vars['pad-y']} unit="mm" step={1} min={5} max={45} onChange={(v) => setVar('pad-y', v)} /></div>
                     </div>
-                  </Field>
-                </Section>
-
-                <Section id="color" title="Color" openMap={openMap} setOpenMap={setOpenMap}>
-                  <Field label="Text"><Chips value={vars['ink']} options={COLOR_SETS.ink} onChange={(v) => setVar('ink', v)} /></Field>
-                  <Field label="Accent"><Chips value={vars['accent']} options={COLOR_SETS.accent} onChange={(v) => setVar('accent', v)} /></Field>
-                  <Field label="Muted"><Chips value={vars['muted']} options={COLOR_SETS.muted} onChange={(v) => setVar('muted', v)} /></Field>
+                    <div className="irow">
+                      <span className="ir-label"><RowIcon name="padX" /><span className="ir-lt">Margin width</span></span>
+                      <div className="ir-ctl"><RowStep value={vars['pad-x']} unit="mm" step={1} min={5} max={45} onChange={(v) => setVar('pad-x', v)} /></div>
+                    </div>
+                  </div>
                 </Section>
               </>
             )}
@@ -1416,9 +1339,7 @@ body { margin: 0; background: #fff; }
         )}
 
         <div className="canvas">
-          <FormatBar exec={exec} active={active} disabled={view !== 'doc'} title={title} setTitle={setTitle}
-            onOpen={() => fileRef.current && fileRef.current.click()}
-            onSave={saveMd} onExport={exportHTML} onPrint={doPrint} />
+          <FormatBar exec={exec} active={active} disabled={view !== 'doc'} onPrint={doPrint} />
           <div className="scroll" ref={scrollRef}>
             <div className="page-host" style={{ zoom, display: view === 'doc' ? undefined : 'none' }}>
               <EditorSurface ref={pageRef} bus={bus} />
@@ -1429,11 +1350,6 @@ body { margin: 0; background: #fff; }
                   onChange={(e) => { setRawMd(e.target.value); refreshActive(); }}
                   onSelect={refreshActive} onKeyUp={refreshActive} onClick={refreshActive} onFocus={refreshActive}
                   placeholder="# Markdown source…" />
-              </div>
-            )}
-            {view === 'css' && (
-              <div className="css-host" style={{ zoom: cssZoom }}>
-                <pre className="css-doc" dangerouslySetInnerHTML={{ __html: highlightCSS(themeCSS(vars)) }} />
               </div>
             )}
           </div>
@@ -1450,7 +1366,6 @@ body { margin: 0; background: #fff; }
           </div>
         </div>
       </div>
-      <ThemeModal open={themeOpen} currentId={themeId} onApply={applyTheme} onClose={() => setThemeOpen(false)} />
     </div>
   );
 }

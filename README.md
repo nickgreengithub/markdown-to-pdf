@@ -11,6 +11,7 @@ the browser's Print dialog) or HTML — all client-side, no build step, no backe
 - Rich theming: fonts, per-heading styles, colors, page margins, element styles
 - Open `.md` / `.zip` (with images) and Save `.md` / `.zip`
 - Paste or insert images (embedded while editing, bundled into a zip on save)
+- Per-image sizing (½ / ¾ / Full) and alignment
 - Print / Export to PDF with correct per-page margins and no browser stamps
 
 ## Running locally

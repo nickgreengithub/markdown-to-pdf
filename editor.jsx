@@ -1,7 +1,7 @@
 /* global React, ReactDOM, marked, hljs, TurndownService, turndownPluginGfm, JSZip, THEMES, FONTS, SAMPLE_MD, LEVELS, levelKeys, expandTheme, getTheme, CSS_ORDER */
 const { useState, useEffect, useRef, useCallback, forwardRef, memo } = React;
 
-const LS = { html: 'mdv2.html', title: 'mdv2.title', theme: 'mdv2.theme', vars: 'mdv2.vars', zoom: 'mdv2.zoom2', rawZoom: 'mdv2.rawZoom', open: 'mdv2.open', side: 'mdv2.side' };
+const LS = { html: 'mdv3.html', title: 'mdv2.title', theme: 'mdv2.theme', vars: 'mdv2.vars', zoom: 'mdv2.zoom2', rawZoom: 'mdv2.rawZoom', open: 'mdv2.open', side: 'mdv2.side' };
 const get = (k, f) => { try { const v = localStorage.getItem(k); return v == null ? f : v; } catch { return f; } };
 const getJSON = (k, f) => { try { const v = localStorage.getItem(k); return v == null ? f : JSON.parse(v); } catch { return f; } };
 const set = (k, v) => { try { localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v)); } catch {} };
@@ -181,7 +181,9 @@ const ChevRight = () => (
 const EditorSurface = memo(forwardRef(function EditorSurface({ bus }, ref) {
   const docRef = useRef(null);
   const pageLocal = useRef(null);
-  const [breaks, setBreaks] = useState([]);
+  const [sheets, setSheets] = useState({ tops: [0], h: 0, gap: 0 }); // A4 page sheets behind the content
+  const [selBox, setSelBox] = useState(null); // overlay box over the targeted image
+  const selIdx = useRef(null);
   const setPage = (node) => {
     pageLocal.current = node;
     if (typeof ref === 'function') ref(node); else if (ref) ref.current = node;
@@ -190,32 +192,129 @@ const EditorSurface = memo(forwardRef(function EditorSurface({ bus }, ref) {
     const el = docRef.current;
     const pageEl = pageLocal.current;
     const highlight = () => { if (window.hljs) el.querySelectorAll('pre code').forEach((c) => { try { hljs.highlightElement(c); } catch {} }); };
-    // recompute where the printed-page boundaries fall, to draw guide lines
-    const recomputeBreaks = () => {
-      if (!pageEl) return;
-      const mmPx = pageEl.offsetWidth / 210; // .page is 210mm wide (border-box)
-      const padY = parseFloat(getComputedStyle(pageEl).paddingTop) || 0;
-      const pageContentH = mmPx * 297 - 2 * padY; // usable height per printed page
-      if (pageContentH <= 40) { setBreaks([]); return; }
-      const total = el.offsetHeight;
-      const n = Math.max(0, Math.floor((total - 1) / pageContentH));
-      const arr = [];
-      for (let k = 1; k <= n; k++) arr.push(Math.round(padY + k * pageContentH));
-      setBreaks((prev) => (prev.length === arr.length && prev.every((v, i) => v === arr[i]) ? prev : arr));
+
+    /* ---- pagination: lay content out onto real A4 sheets with whitespace ---- */
+    const contentBlocks = () => Array.prototype.filter.call(el.children, (n) => n.nodeType === 1 && !n.classList.contains('pg-spacer'));
+    const clearSpacers = () => el.querySelectorAll('.pg-spacer').forEach((n) => n.remove());
+    // clean HTML for persistence/output: never include the layout spacers
+    const cleanedHTML = () => {
+      const c = el.cloneNode(true);
+      c.querySelectorAll('.pg-spacer').forEach((n) => n.remove());
+      return c.innerHTML;
     };
-    el.innerHTML = initialHTML();
-    highlight();
-    bus.current.report(el);
-    recomputeBreaks();
-    const ro = new ResizeObserver(recomputeBreaks);
+    let lastSig = '';
+    let busy = false;
+    const layout = () => {
+      const mmPx = pageEl.offsetWidth / 210;
+      const A4h = mmPx * 297;
+      const padY = parseFloat(getComputedStyle(el).paddingTop) || 0;
+      const C = A4h - 2 * padY;                 // usable content height per page
+      const gap = Math.round(mmPx * 7);         // visual gutter between sheets
+      if (C <= 60) { setSheets({ tops: [0], h: Math.round(A4h) || 0, gap }); return; }
+      const topOf = (p) => padY + p * (A4h + gap);          // content-area top of page p
+      const botOf = (p) => topOf(p) + C;                    // content-area bottom of page p
+      const EPS = 1.5;
+      const pageOfTop = (y) => Math.max(0, Math.floor((y - padY + EPS) / (A4h + gap)));
+      // place block b so its top lands at `want` (only ever pushes downward)
+      const pushTo = (b, want) => {
+        const cur = b.offsetTop;
+        if (want <= cur + 0.5) return;
+        const sp = document.createElement('div');
+        sp.className = 'pg-spacer';
+        sp.setAttribute('contenteditable', 'false');
+        sp.style.height = (want - cur) + 'px';
+        el.insertBefore(sp, b);
+        for (let it = 0; it < 4; it++) {     // converge despite margin collapsing
+          const d = want - b.offsetTop;
+          if (Math.abs(d) < 0.6) break;
+          sp.style.height = Math.max(0, parseFloat(sp.style.height) + d) + 'px';
+        }
+      };
+      // save the caret so re-inserting spacers doesn't move it
+      let caret = null;
+      const s0 = window.getSelection();
+      if (s0 && s0.rangeCount && el.contains(s0.anchorNode))
+        caret = { a: s0.anchorNode, ao: s0.anchorOffset, f: s0.focusNode, fo: s0.focusOffset };
+      clearSpacers();
+      let page = 0;
+      const blocks = contentBlocks();
+      for (let bi = 0; bi < blocks.length; bi++) {
+        const b = blocks[bi];
+        let top = b.offsetTop;
+        let h = b.offsetHeight;
+        let p = Math.max(page, pageOfTop(top));
+        // a block "fits" only if it sits inside page p's content area without overflowing
+        const fits = top >= topOf(p) - EPS && top + h <= botOf(p) + EPS;
+        if (!fits) {
+          if (h <= C + EPS) {
+            p += 1; pushTo(b, topOf(p));        // move the whole block onto the next page
+          } else if (top > topOf(p) + EPS) {
+            p += 1; pushTo(b, topOf(p));        // oversized: start it at a page top, then it spans
+          }
+          top = b.offsetTop; h = b.offsetHeight;
+        }
+        page = Math.max(page, p, pageOfTop(top + Math.max(0, h - EPS)));
+      }
+      if (caret) { try { const s = window.getSelection(); const r = document.createRange(); r.setStart(caret.a, caret.ao); r.setEnd(caret.f, caret.fo); s.removeAllRanges(); s.addRange(r); } catch {} }
+      const count = page + 1;
+      const tops = [];
+      for (let i = 0; i < count; i++) tops.push(Math.round(i * (A4h + gap)));
+      setSheets({ tops, h: Math.round(A4h), gap });
+      if (bus.current.reportPages) bus.current.reportPages(count);
+      positionSel();
+    };
+    const recompute = () => {
+      if (!pageEl || busy) return;
+      const padY = parseFloat(getComputedStyle(el).paddingTop) || 0;
+      const sig = Math.round(pageEl.offsetWidth) + '|' + Math.round(padY) + '|'
+        + contentBlocks().map((b) => Math.round(b.offsetHeight)).join(',');
+      if (sig === lastSig) return;
+      lastSig = sig;
+      busy = true;
+      try { layout(); } finally { busy = false; }
+    };
+    const relayout = () => { lastSig = ''; recompute(); }; // force after content replace
+
+    // draw/refresh the highlight box over the currently targeted image
+    const positionSel = () => {
+      const i = selIdx.current;
+      if (i == null) { setSelBox(null); return; }
+      const im = el.querySelectorAll('img')[i];
+      if (!im) { setSelBox(null); return; }
+      setSelBox({ top: im.offsetTop, left: im.offsetLeft, width: im.offsetWidth, height: im.offsetHeight, n: i + 1 });
+    };
+    const stored = get(LS.html, null);
+    if (stored != null) {
+      el.innerHTML = reflowHTML(stored);
+      highlight(); bus.current.report(el); relayout();
+    } else {
+      // first run (or after a cache reset): start from the bundled Report.md
+      el.innerHTML = mdToHTML(SAMPLE_MD);
+      highlight(); bus.current.report(el); relayout();
+      fetch('Report.md').then((r) => { if (!r.ok) throw 0; return r.text(); })
+        .then((md) => { bus.current.setDoc(mdFileToHTML(md)); })
+        .catch(() => {});
+    }
+    const ro = new ResizeObserver(() => recompute());
     ro.observe(el); ro.observe(pageEl);
-    const onInput = () => { set(LS.html, el.innerHTML); bus.current.report(el); recomputeBreaks(); };
+    requestAnimationFrame(() => relayout()); // re-run once App has wired report callbacks
+    const onInput = () => { set(LS.html, cleanedHTML()); bus.current.report(el); recompute(); };
     el.addEventListener('input', onInput);
+    // selecting an image by clicking it (native click selection is unreliable in contenteditable)
+    const onClick = (e) => {
+      const img = e.target && e.target.closest && e.target.closest('img');
+      if (!img || !el.contains(img)) return;
+      try { const r = document.createRange(); r.selectNode(img); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); } catch {}
+    };
+    el.addEventListener('click', onClick);
     const insertImg = (url) => {
+      if (el.querySelectorAll('img').length >= 99) { if (bus.current.flash) bus.current.flash('Maximum 99 images'); return false; }
       el.focus();
       document.execCommand('insertHTML', false, `<img src="${url}" alt="" />`);
-      set(LS.html, el.innerHTML);
+      set(LS.html, cleanedHTML());
       bus.current.report(el);
+      relayout();
+      return true;
     };
     const onPaste = (e) => {
       const items = (e.clipboardData && e.clipboardData.items) || [];
@@ -234,24 +333,65 @@ const EditorSurface = memo(forwardRef(function EditorSurface({ bus }, ref) {
     el.addEventListener('paste', onPaste);
     bus.current.focus = () => el.focus();
     bus.current.insertImage = insertImg;
-    bus.current.getDoc = () => el.innerHTML;
-    bus.current.setDoc = (html) => {
-      el.innerHTML = html;
-      highlight();
-      set(LS.html, el.innerHTML);
-      bus.current.report(el);
-      recomputeBreaks();
+    bus.current.imageCount = () => el.querySelectorAll('img').length;
+    bus.current.getImageWidth = (i) => {
+      const im = el.querySelectorAll('img')[i];
+      return im ? (im.style.width || '100%') : '100%';
     };
-    return () => { el.removeEventListener('input', onInput); el.removeEventListener('paste', onPaste); ro.disconnect(); };
+    bus.current.setImageWidth = (i, w) => {
+      const im = el.querySelectorAll('img')[i];
+      if (!im) return;
+      im.style.width = w;
+      set(LS.html, cleanedHTML());
+      bus.current.report(el);
+      relayout();
+      positionSel();
+      requestAnimationFrame(() => { relayout(); positionSel(); }); // re-fit once the image height settles
+    };
+    bus.current.getImageAlign = (i) => {
+      const im = el.querySelectorAll('img')[i];
+      if (!im) return 'center';
+      const l = im.style.marginLeft, r = im.style.marginRight;
+      if (l === 'auto' && r === 'auto') return 'center';
+      if (l === 'auto') return 'right';
+      if (r === 'auto') return 'left';
+      return 'center';
+    };
+    bus.current.setImageAlign = (i, a) => {
+      const im = el.querySelectorAll('img')[i];
+      if (!im) return;
+      im.style.marginLeft = a === 'left' ? '0' : 'auto';
+      im.style.marginRight = a === 'right' ? '0' : 'auto';
+      set(LS.html, cleanedHTML());
+      relayout();
+      positionSel();
+    };
+    bus.current.highlightImage = (i) => { selIdx.current = i; positionSel(); };
+    bus.current.getDoc = () => cleanedHTML();
+    bus.current.setDoc = (html) => {
+      el.innerHTML = reflowHTML(html); // join soft-wrapped lines so prose justifies, on every path
+      highlight();
+      set(LS.html, cleanedHTML());
+      bus.current.report(el);
+      relayout();
+    };
+    return () => { el.removeEventListener('input', onInput); el.removeEventListener('paste', onPaste); el.removeEventListener('click', onClick); ro.disconnect(); };
   }, []);
+  const stackH = sheets.h ? sheets.tops[sheets.tops.length - 1] + sheets.h : undefined;
   return (
-    <div className="page" ref={setPage}>
-      <div className="doc" contentEditable suppressContentEditableWarning ref={docRef} spellCheck={false} />
-      {breaks.map((y, i) => (
-        <div className="page-break" style={{ top: y + 'px' }} key={i} contentEditable={false}>
-          <span className="page-break-label">Page {i + 2}</span>
+    <div className="page" ref={setPage} style={{ height: stackH ? stackH + 'px' : undefined }}>
+      {sheets.tops.map((top, i) => (
+        <div className="sheet" key={i} contentEditable={false} style={{ top: top + 'px', height: sheets.h + 'px' }}>
+          <span className="sheet-label">Page {i + 1}</span>
         </div>
       ))}
+      <div className="doc" contentEditable suppressContentEditableWarning ref={docRef} spellCheck={false} />
+      {selBox && (
+        <div className="img-sel-box" contentEditable={false}
+          style={{ top: selBox.top + 'px', left: selBox.left + 'px', width: selBox.width + 'px', height: selBox.height + 'px' }}>
+          <span className="img-sel-tag">Image {String(selBox.n).padStart(2, '0')}</span>
+        </div>
+      )}
     </div>
   );
 }));
@@ -577,13 +717,20 @@ function docActive(docEl) {
   if (!sel || sel.rangeCount === 0 || !docEl.contains(sel.anchorNode)) return set;
   let node = sel.anchorNode;
   let el = node && node.nodeType === 3 ? node.parentElement : node;
-  let inBlockquote = false, inUL = false, inOL = false, firstBlock = '';
+  let inBlockquote = false, inUL = false, inOL = false, firstBlock = '', onImage = false, imgEl = null;
+  // an image selected by click reports the anchor as its parent + an offset
+  if (node && node.nodeType === 1) {
+    const c = node.childNodes[sel.anchorOffset] || node.childNodes[sel.anchorOffset - 1];
+    if (c && c.nodeName === 'IMG') { onImage = true; imgEl = c; }
+    else if (node.nodeName === 'IMG') { onImage = true; imgEl = node; }
+  }
   while (el && el !== docEl) {
     const tag = el.tagName;
     if (tag === 'EM' || tag === 'I') set.add('cmd:italic');
     if (tag === 'STRONG' || tag === 'B') set.add('cmd:bold');
     if (tag === 'S' || tag === 'STRIKE' || tag === 'DEL') set.add('cmd:strikeThrough');
     if (tag === 'A') set.add('link');
+    if (tag === 'IMG') { onImage = true; imgEl = el; }
     if (tag === 'TABLE') set.add('table');
     if (tag === 'BLOCKQUOTE') inBlockquote = true;
     if (tag === 'UL') inUL = true;
@@ -599,7 +746,11 @@ function docActive(docEl) {
   }
   // sidebar-sync markers (ignored by the toolbar)
   set.add('lvl:' + (/^H[1-4]$/.test(firstBlock) ? firstBlock : 'P'));
-  if (set.has('link')) set.add('el:link');
+  if (onImage) {
+    set.add('el:image');
+    const idx = imgEl ? Array.prototype.indexOf.call(docEl.querySelectorAll('img'), imgEl) : -1;
+    if (idx >= 0) set.add('imgidx:' + idx);
+  } else if (set.has('link')) set.add('el:link');
   else if (inUL || inOL) set.add('el:list');
   else if (inBlockquote) set.add('el:quote');
   else if (set.has('table')) set.add('el:table');
@@ -730,7 +881,7 @@ function MarkdownGuide() {
 const FOOT_LABEL = { raw: 'RAW MARKDOWN', css: 'THEME CSS' };
 const TARGET_LABEL = {
   h1: 'Heading 1', h2: 'Heading 2', h3: 'Heading 3', h4: 'Heading 4', p: 'Body text',
-  quote: 'Blockquote', link: 'Link', list: 'List', table: 'Table',
+  quote: 'Blockquote', link: 'Link', list: 'List', table: 'Table', image: 'Image',
 };
 const TARGET_GROUPS = [
   { label: 'Text', items: [{ key: 'h1' }, { key: 'h2' }, { key: 'h3' }, { key: 'h4' }, { key: 'p' }] },
@@ -739,7 +890,7 @@ const TARGET_GROUPS = [
 const COLOR_OPTS = { accent: COLOR_SETS.accent, muted: COLOR_SETS.muted, rule: COLOR_SETS.rule, codebg: COLOR_SETS.codebg };
 
 /* Custom, on-design target picker (opens on hover or click). */
-function TargetMenu({ value, current, vars, onChange }) {
+function TargetMenu({ value, current, vars, onChange, numLabel }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const closeT = useRef(null);
@@ -758,7 +909,7 @@ function TargetMenu({ value, current, vars, onChange }) {
   return (
     <div className="tsel" ref={ref} onMouseEnter={openNow} onMouseLeave={closeSoon}>
       <button className={'tsel-btn' + (open ? ' open' : '')} onClick={() => (open ? setOpen(false) : openNow())}>
-        <span>{TARGET_LABEL[value]}</span>
+        <span>{TARGET_LABEL[value]}{value === 'image' && numLabel ? ' ' + numLabel : ''}</span>
         {!current
           ? <span className="tsel-cur tsel-cur-btn tsel-cur-none">no selection</span>
           : current === value
@@ -796,6 +947,18 @@ function TargetMenu({ value, current, vars, onChange }) {
 /* The unified, single-row style inspector. Every target shows the same row
    set; controls that don't apply to the current target are disabled. */
 function inspectorRows(target) {
+  // image is special: it's only reachable by clicking an image, and only sizes/aligns.
+  // pad with empty rows so the inspector keeps the same height as every other style.
+  if (target === 'image') {
+    const rows = [
+      { label: 'Width', type: 'imgwidth', v: 'img', opts: [['50%', '\u00bd'], ['75%', '\u00be'], ['100%', 'Full']] },
+      { label: 'Align', type: 'imgalign', v: 'img', opts: [['left', '\u2190'], ['center', '\u2194'], ['right', '\u2192']] },
+    ];
+    const std = inspectorRows('p').length;
+    let n = 0;
+    while (rows.length < std) rows.push({ label: '', type: 'fill', v: null, _k: 'fill' + (n++) });
+    return rows;
+  }
   const lvl = /^(h[1-4]|p)$/.test(target);
   const k = lvl ? levelKeys(target) : {};
   const heading = /^h[1-4]$/.test(target);
@@ -837,9 +1000,29 @@ function RowStep({ value, unit, step, min, max, disabled, onChange }) {
     </div>
   );
 }
-function RowControl({ row, vars, setVar, disabled }) {
+function RowControl({ row, vars, setVar, disabled, img }) {
   const v = row.v;
   const val = v ? vars[v] : undefined;
+  if (row.type === 'imgwidth')
+    return (
+      <div className="ir-seg">
+        {row.opts.map(([opt, lab]) => (
+          <button key={opt} className={'ir-seg-b' + (!disabled && img && img.width === opt ? ' on' : '')}
+            disabled={disabled || !(img && img.count)} onClick={() => img.setWidth(opt)}>{lab}</button>
+        ))}
+      </div>
+    );
+  if (row.type === 'imgalign') {
+    const off = disabled || !(img && img.count) || (img && img.width === '100%'); // alignment is moot at full width
+    return (
+      <div className="ir-seg">
+        {row.opts.map(([opt, lab]) => (
+          <button key={opt} className={'ir-seg-b' + (!off && img && img.align === opt ? ' on' : '')}
+            title={opt} disabled={off} onClick={() => img.setAlign(opt)}>{lab}</button>
+        ))}
+      </div>
+    );
+  }
   if (row.type === 'font')
     return (
       <select className="ir-font" disabled={disabled} value={disabled ? '' : (val || '')} onChange={(e) => setVar(v, e.target.value)}>
@@ -862,15 +1045,15 @@ function RowControl({ row, vars, setVar, disabled }) {
     return <Chips value={disabled ? '' : val} options={COLOR_OPTS[row.opts] || COLOR_SETS.accent} disabled={disabled} onChange={(c) => setVar(v, c)} />;
   return null;
 }
-function Inspector({ target, vars, setVar }) {
+function Inspector({ target, vars, setVar, img }) {
   return (
     <div className="insp">
       {inspectorRows(target).map((r) => {
         const off = !r.v;
         return (
-          <div className={'irow' + (off ? ' off' : '') + (r.type === 'font' ? ' wide' : '')} key={r.label}>
+          <div className={'irow' + (off ? ' off' : '') + (r.type === 'font' ? ' wide' : '') + (r.type === 'fill' ? ' fill' : '')} key={r._k || r.label}>
             <span className="ir-label">{r.label}</span>
-            <div className="ir-ctl"><RowControl row={r} vars={vars} setVar={setVar} disabled={off} /></div>
+            <div className="ir-ctl"><RowControl row={r} vars={vars} setVar={setVar} disabled={off} img={img} /></div>
           </div>
         );
       })}
@@ -900,6 +1083,10 @@ function App() {
   const [target, setTarget] = useState('h1'); // which style the inspector edits
   const [docStyle, setDocStyle] = useState(null); // style of the element under the caret/selection
   const [active, setActive] = useState(() => new Set());
+  const [imgIdx, setImgIdx] = useState(0);     // which image the Image style edits (0-based)
+  const [imgCount, setImgCount] = useState(0); // images in the document
+  const [imgWidth, setImgWidth] = useState('100%'); // selected image's current width
+  const [imgAlign, setImgAlign] = useState('center'); // selected image's alignment
 
   const pageRef = useRef(null);
   const scrollRef = useRef(null);
@@ -918,6 +1105,7 @@ function App() {
   useEffect(() => { set(LS.side, sideOpen ? '1' : '0'); }, [sideOpen]);
 
   const flash = (m) => { setToast(m); clearTimeout(flash._t); flash._t = setTimeout(() => setToast(''), 1300); };
+  useEffect(() => { bus.current.flash = flash; });
 
   // apply CSS vars to the page element (never touches editable content)
   useEffect(() => {
@@ -928,14 +1116,11 @@ function App() {
   // measure words + page count
   const report = useCallback((el) => {
     const words = (el.innerText.trim().match(/\S+/g) || []).length;
-    const padMm = parseFloat(vars['pad-y']) || 20;
-    const pxMm = 96 / 25.4;
-    const usable = (297 - padMm * 2) * pxMm;
-    const inner = el.scrollHeight - 0;
-    const pages = Math.max(1, Math.ceil(inner / usable));
-    setStats({ words, pages });
-  }, [vars]);
+    setStats((s) => ({ ...s, words }));
+    setImgCount(el.querySelectorAll('img').length);
+  }, []);
   useEffect(() => { bus.current.report = report; }, [report]);
+  useEffect(() => { bus.current.reportPages = (n) => setStats((s) => ({ ...s, pages: Math.max(1, n) })); }, []);
   useEffect(() => { if (pageRef.current) report(pageRef.current.querySelector('.doc')); }, [vars, zoom, report]);
 
   const setVar = (k, v) => setVars((p) => ({ ...p, [k]: v }));
@@ -968,12 +1153,24 @@ function App() {
     }
     setActive(set);
     // derive a single inspector target from the caret (element-priority, else text level)
-    const D = set.has('el:link') ? 'link'
+    const D = set.has('el:image') ? 'image'
+      : set.has('el:link') ? 'link'
       : set.has('el:list') ? 'list'
       : set.has('el:quote') ? 'quote'
       : set.has('el:table') ? 'table'
       : (['h1', 'h2', 'h3', 'h4'].find((h) => set.has('lvl:' + h.toUpperCase())) || (set.has('lvl:P') ? 'p' : null));
     setDocStyle(D || null);
+    if (view === 'doc' && bus.current.imageCount) setImgCount(bus.current.imageCount());
+    // when an image is under the caret, focus that exact one
+    if (D === 'image') {
+      let ii = null;
+      set.forEach((s) => { if (s.indexOf('imgidx:') === 0) ii = parseInt(s.slice(7), 10); });
+      if (ii != null) {
+        setImgIdx(ii);
+        if (bus.current.getImageWidth) setImgWidth(bus.current.getImageWidth(ii));
+        if (bus.current.getImageAlign) setImgAlign(bus.current.getImageAlign(ii));
+      }
+    }
     // only retarget when the caret moves to a *different* block — so manual picks stick
     if (D && D !== autoTargetRef.current) { autoTargetRef.current = D; setTarget(D); }
   }, [view]);
@@ -982,6 +1179,21 @@ function App() {
     document.addEventListener('selectionchange', refreshActive);
     return () => document.removeEventListener('selectionchange', refreshActive);
   }, [refreshActive]);
+
+  // highlight the targeted image in the document (and clear it otherwise)
+  useEffect(() => {
+    if (!bus.current.highlightImage) return;
+    const showing = view === 'doc' && target === 'image' && imgCount > 0;
+    bus.current.highlightImage(showing ? Math.min(imgIdx, imgCount - 1) : null);
+    if (showing && bus.current.getImageWidth) setImgWidth(bus.current.getImageWidth(imgIdx));
+    if (showing && bus.current.getImageAlign) setImgAlign(bus.current.getImageAlign(imgIdx));
+  }, [view, target, imgIdx, imgCount]);
+
+  const imgCtx = {
+    count: imgCount, width: imgWidth, align: imgAlign,
+    setWidth: (w) => { if (bus.current.setImageWidth) bus.current.setImageWidth(imgIdx, w); setImgWidth(w); },
+    setAlign: (a) => { if (bus.current.setImageAlign) bus.current.setImageAlign(imgIdx, a); setImgAlign(a); },
+  };
 
   const exec = (t) => {
     if (t.type === 'image') { imgRef.current && imgRef.current.click(); return; }
@@ -1061,7 +1273,7 @@ function App() {
     return { html: doc.body.innerHTML, assets };
   };
   const saveMd = async () => {
-    const baseHTML = view === 'raw' ? mdToHTML(rawMd) : bus.current.getDoc();
+    const baseHTML = view === 'raw' ? mdFileToHTML(rawMd) : bus.current.getDoc();
     const { html, assets } = extractAssets(baseHTML);
     const md = htmlToMD(html);
     if (assets.length && window.JSZip) {
@@ -1079,7 +1291,7 @@ function App() {
   const saveRef = useRef(saveMd); saveRef.current = saveMd;
 
   const exportHTML = async () => {
-    const docHTML = view === 'raw' ? mdToHTML(rawMd) : bus.current.getDoc();
+    const docHTML = view === 'raw' ? mdFileToHTML(rawMd) : bus.current.getDoc();
     let docCss = '';
     try { docCss = await (await fetch('doc.css')).text(); } catch {}
     const varCss = Object.keys(vars).map((k) => `--${k}: ${vars[k]};`).join(' ');
@@ -1119,7 +1331,7 @@ body { margin: 0; background: #fff; }
     if (view === 'raw') setRawZoom(apply); else if (view === 'css') setCssZoom(apply); else setZoom(apply);
   };
   const doPrint = () => {
-    const html = view === 'raw' ? mdToHTML(rawMd) : bus.current.getDoc();
+    const html = view === 'raw' ? mdFileToHTML(rawMd) : bus.current.getDoc();
     const old = document.getElementById('print-root');
     if (old) old.remove();
     const pr = document.createElement('div');
@@ -1174,8 +1386,9 @@ body { margin: 0; background: #fff; }
                 </Section>
 
                 <Section title="Style">
-                  <TargetMenu value={target} current={docStyle} vars={vars} onChange={setTarget} />
-                  <Inspector target={target} vars={vars} setVar={setVar} />
+                  <TargetMenu value={target} current={docStyle} vars={vars} onChange={setTarget}
+                    numLabel={imgCount > 0 ? String(Math.min(imgIdx, imgCount - 1) + 1).padStart(2, '0') : ''} />
+                  <Inspector target={target} vars={vars} setVar={setVar} img={imgCtx} />
                 </Section>
 
                 <Section id="page" title="Page" openMap={openMap} setOpenMap={setOpenMap}>

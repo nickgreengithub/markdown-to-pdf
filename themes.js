@@ -145,6 +145,7 @@ window.expandTheme = function (v) {
     'list-marker': v['list-marker'] || v['muted'], 'list-gap': v['list-gap'] || '0.25em', 'list-indent': v['list-indent'] || '1.4em',
     'tbl-head-bg': v['tbl-head-bg'] || v['code-bg'], 'tbl-border': v['tbl-border'] || v['rule'],
     'tbl-pad-y': v['tbl-pad-y'] || '0.45em', 'tbl-pad-x': v['tbl-pad-x'] || '0.7em',
+    'img-width': v['img-width'] || '100%',
   };
   ['h1', 'h2', 'h3', 'h4'].forEach((L) => {
     out[L + '-font'] = v['font-head'];
@@ -172,5 +173,6 @@ window.CSS_ORDER = [
   'link-color', 'link-deco',
   'list-marker', 'list-gap', 'list-indent',
   'tbl-head-bg', 'tbl-border', 'tbl-pad-y', 'tbl-pad-x',
+  'img-width',
   'pad-y', 'pad-x', 'measure', 'ink', 'paper', 'accent', 'muted', 'rule', 'code-bg',
 ];

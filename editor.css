@@ -561,6 +561,8 @@ button { font-family: inherit; cursor: pointer; color: inherit; }
 .irow.wide .ir-ctl { display: block; }
 .irow.off { opacity: .36; }
 .irow.off .ir-ctl { pointer-events: none; }
+/* empty padding rows keep the inspector height constant without drawing lines */
+.irow.fill { border-bottom-color: transparent; }
 
 .rstep { display: inline-flex; align-items: center; border: 1px solid var(--edge); border-radius: 7px; background: var(--field); overflow: hidden; }
 .rstep button { width: 26px; height: 28px; border: 0; background: transparent; color: var(--text-2); font-size: 14px; display: grid; place-items: center; }
@@ -580,6 +582,16 @@ button { font-family: inherit; cursor: pointer; color: inherit; }
   background-position: calc(100% - 14px) 13px, calc(100% - 9px) 13px; background-size: 5px 5px, 5px 5px; background-repeat: no-repeat;
 }
 .ir-font:focus { border-color: var(--hi); }
+
+/* segmented choice (e.g. image width: ½ ¾ Full) */
+.ir-seg { display: inline-flex; border: 1px solid var(--edge); border-radius: 7px; background: var(--field); overflow: hidden; }
+.ir-seg-b {
+  height: 28px; min-width: 34px; padding: 0 9px; border: 0; border-left: 1px solid var(--edge);
+  background: transparent; font-size: 12px; font-weight: 600; color: var(--text-2); cursor: pointer;
+}
+.ir-seg-b:first-child { border-left: 0; }
+.ir-seg-b:hover:not(:disabled) { background: var(--field-2); color: var(--text); }
+.ir-seg-b.on { background: var(--hi); color: #fff; }
 
 /* color chips compact enough for one row */
 .ir-ctl .chips { gap: 5px; flex-wrap: nowrap; }

@@ -30,13 +30,13 @@
 .sheet {
   position: relative; width: 210mm; height: 297mm; box-sizing: border-box;
   background: var(--paper); color: var(--ink);
-  box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 12px 40px rgba(0,0,0,.13);
+  box-shadow: 0 1px 2px rgba(0,0,0,.2), 0 14px 44px rgba(0,0,0,.35);
   border-radius: 2px; overflow: visible; /* the .doc inside clips; the label sits above the sheet */
 }
 .sheet-label {
   position: absolute; right: 0; top: -22px; padding: 2px 9px; border-radius: 99px;
   font: 600 9.5px/1.4 system-ui, sans-serif; letter-spacing: .04em;
-  color: #fff; background: rgba(0,0,0,.28); pointer-events: none;
+  color: #e6e8ec; background: rgba(0,0,0,.35); pointer-events: none;
 }
 .sheet.overflows::after {
   content: 'clipped'; position: absolute; right: 8px; bottom: 8px; padding: 2px 8px; border-radius: 99px;

@@ -1,7 +1,7 @@
 # Markdown Studio — redesign
 
-Status: in progress. This document is the design the rewrite follows; update it when a
-decision changes.
+Status: implemented. This document is the design the rewrite follows; update it when a
+decision changes. Deviations from the first draft are listed at the end.
 
 ## Why
 
@@ -105,3 +105,14 @@ print resolve names to object URLs. Demo figures are seeded into the library.
 - Layout must wait for `document.fonts.ready` or page breaks shift after first paint.
 - Pagination cost on large documents: debounce; make incremental if needed.
 - Table splitting (repeating header rows, rows taller than a page) is the fiddliest piece.
+
+## Deviations from the plan, as built
+
+- Code blocks are not colour-coded (highlight.js was dropped): a highlighted block cannot be
+  split across pages cleanly, and print fidelity mattered more.
+- `align=left` / `align=right` place a narrower figure at that side without wrapping text
+  around it. Floats would put content outside the flow the paginator measures.
+- Paragraphs move to the next page whole; there is no widow / orphan splitting yet.
+- A `\pagebreak` on the last line leaves a blank trailing page, on purpose.
+- The gutter glyph doubles as the "what is this line" affordance; hover help covers inline
+  constructs. Both share the same content as the `/` menu and the reference panel.

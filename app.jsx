@@ -106,17 +106,17 @@ function App() {
   const [initialMd, setInitialMd] = useState('');
   const [md, setMd] = useState('');
   const [libTick, setLibTick] = useState(0);
-  const [themeId, setThemeId] = useState(() => get(LS.theme, t0.id));
+  const [themeId, setThemeId] = useState(() => get(LS.theme, get('mdv2.theme', t0.id)));
   const [vars, setVars] = useState(() => {
-    const persisted = getJSON(LS.vars, null);
-    const base = expandTheme(getTheme(get(LS.theme, t0.id)).vars);
+    const persisted = getJSON(LS.vars, getJSON('mdv2.vars', null)); // the previous version's key, if any
+    const base = expandTheme(getTheme(get(LS.theme, get('mdv2.theme', t0.id))).vars);
     return persisted ? { ...base, ...persisted, paper: '#ffffff' } : base;
   });
   const [ui, setUi] = useState(() => ({ mode: 'single', zoom: null, split: 0.42, help: false, pageNumbers: 'none', narrow: 'md', ...getJSON(LS.ui, {}) }));
   const [libOpen, setLibOpen] = useState(false);
   const [toast, setToast] = useState('');
   const [stats, setStats] = useState({ pages: 1, words: 0 });
-  const [currentLine, setCurrentLine] = useState(0);
+  const [currentLine, setCurrentLine] = useState(null); // no outline until the author interacts
   const [caretDriven, setCaretDriven] = useState(false);
   const [popover, setPopover] = useState(null);
   const bus = useRef({});
@@ -196,9 +196,10 @@ function App() {
     const m = bus.current.md;
     let ln = popover.line, text = null;
     for (let n = popover.line; n < (popover.lineEnd || popover.line + 1); n++) { const t = m.getLine(n); if (t && Dialect.getImageAttrs(t, popover.imgName)) { ln = n; text = t; break; } }
-    if (text == null) return { name: popover.imgName, attrs: {}, set: () => {} };
+    const missing = !Library.has(popover.imgName) && !/^(https?:|data:|blob:)/.test(popover.imgName);
+    if (text == null) return { name: popover.imgName, attrs: {}, set: () => {}, missing };
     return {
-      name: popover.imgName, attrs: Dialect.getImageAttrs(text, popover.imgName) || {},
+      name: popover.imgName, attrs: Dialect.getImageAttrs(text, popover.imgName) || {}, missing,
       set: (patch) => { const cur = m.getLine(ln); const next = Dialect.setImageAttrs(cur, popover.imgName, patch); if (next != null && next !== cur) m.setLine(ln, next); },
     };
   }, [popover, md]);
@@ -338,7 +339,8 @@ function App() {
         <StylePopover target={popover.target} anchorRect={popover.anchorRect} bounds={bus.current.pv && bus.current.pv.root() ? bus.current.pv.root().getBoundingClientRect() : null}
           vars={vars} setVar={setVar} onReset={resetKeys} img={imgCtx} line={popover.line}
           onClose={() => setPopover(null)} onSwitch={(t) => setPopover((p) => ({ ...p, target: t }))}
-          onGoto={(l) => bus.current.md && bus.current.md.gotoLine(l, { focus: true })} />
+          onGoto={(l) => bus.current.md && bus.current.md.gotoLine(l, { focus: true })}
+          onOpenLibrary={() => { setPopover(null); setLibOpen(true); }} />
       )}
       {libOpen && <LibraryDialog onClose={() => setLibOpen(false)} used={usedImages} flash={flash}
         onInsert={(name) => { setLibOpen(false); bus.current.md.insert(`![](${name} "Caption")`, true); }} />}

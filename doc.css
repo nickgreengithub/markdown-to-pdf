@@ -1,70 +1,66 @@
 /* ============================================================
-   Document render styles — everything inside .doc is the
-   user's markdown. All visual decisions come from CSS vars
-   declared on the .page element (set live from the app).
+   Document render styles — everything inside .doc is the user's
+   markdown. All visual decisions come from CSS variables set on
+   the .preview element (live, from the theme) and on #print-root.
    ============================================================ */
 
-.page {
+.preview, #print-root {
   /* sensible fallbacks; overwritten inline from theme vars */
   --font-body: 'Public Sans', system-ui, sans-serif;
   --font-head: 'Public Sans', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
   --fs-base: 15.5px;
   --lh: 1.65;
-  --scale: 1.2;
   --para: 0.9em;
   --pad-y: 20mm;
   --pad-x: 20mm;
   --measure: none;
-  --head-weight: 650;
-  --head-tracking: -0.01em;
-  --head-transform: none;
-  --head-rules: 1;
   --ink: #1b1d22;
   --paper: #ffffff;
   --accent: #2f64e6;
   --muted: #6b7280;
   --rule: #e6e8ec;
   --code-bg: #f4f5f8;
-
-  width: 210mm;
-  min-height: 297mm;
-  box-sizing: border-box;
-  margin: 0 auto;
-  color: var(--ink);
-  position: relative;
 }
-/* the visual A4 sheets that sit behind the editable content */
+
+/* ---- the sheets ---------------------------------------------------------- */
+.sheets { display: grid; grid-template-columns: 210mm; gap: 28px; justify-content: center; padding: 36px; }
+.sheets.mode-spread { grid-template-columns: repeat(2, 210mm); }
+.sheets.mode-grid   { grid-template-columns: repeat(3, 210mm); }
 .sheet {
-  position: absolute; left: 0; width: 210mm; box-sizing: border-box;
-  background: var(--paper);
+  position: relative; width: 210mm; height: 297mm; box-sizing: border-box;
+  background: var(--paper); color: var(--ink);
   box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 12px 40px rgba(0,0,0,.13);
-  border-radius: 2px; z-index: 0; pointer-events: none;
+  border-radius: 2px; overflow: visible; /* the .doc inside clips; the label sits above the sheet */
 }
 .sheet-label {
-  position: absolute; right: -2px; top: -20px; padding: 2px 9px; border-radius: 99px;
-  font: 600 9.5px/1.4 var(--font-body, system-ui), sans-serif; letter-spacing: .04em;
-  color: var(--muted, #6b7280); background: rgba(255,255,255,.7);
+  position: absolute; right: 0; top: -22px; padding: 2px 9px; border-radius: 99px;
+  font: 600 9.5px/1.4 system-ui, sans-serif; letter-spacing: .04em;
+  color: #6b7280; background: rgba(255,255,255,.7); pointer-events: none;
 }
-/* layout-only spacers that push content onto the next sheet (never persisted) */
-.pg-spacer { width: 100%; pointer-events: none; user-select: none; }
-/* the editable layer sits above the sheets and carries the page margins */
-.page > .doc {
-  position: relative; z-index: 1; box-sizing: border-box;
-  padding: var(--pad-y) var(--pad-x); min-height: 297mm;
+.sheet.overflows::after {
+  content: 'clipped'; position: absolute; right: 8px; bottom: 8px; padding: 2px 8px; border-radius: 99px;
+  font: 600 9.5px/1.4 system-ui, sans-serif; color: #fff; background: #b8402a;
 }
-/* highlight box drawn over the image currently targeted by the Image style */
-.img-sel-box {
-  position: absolute; pointer-events: none; z-index: 5; border-radius: 3px;
-  outline: 2px solid var(--accent, #2f64e6);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent, #2f64e6) 22%, transparent);
+.sheet > .doc {
+  position: relative; box-sizing: border-box; height: 100%;
+  padding: var(--pad-y) var(--pad-x); overflow: hidden;
 }
-.img-sel-tag {
-  position: absolute; left: -2px; top: -9px; padding: 1px 7px; border-radius: 99px;
-  font: 600 9px/1.4 var(--font-body, system-ui), sans-serif; letter-spacing: .04em;
-  color: #fff; background: var(--accent, #2f64e6); white-space: nowrap;
+.pnum {
+  position: absolute; left: 0; right: 0; bottom: calc(var(--pad-y) / 2 - 0.6em); text-align: center;
+  font: 500 0.78rem/1.2 var(--font-body); color: var(--muted); font-variant-numeric: tabular-nums;
 }
+/* hidden, unzoomed measuring area: a sheet's .doc without the height cap */
+.measure-host { position: absolute; left: 0; top: 0; visibility: hidden; pointer-events: none; z-index: -1; zoom: 1; }
+.measure-host .sheet { height: auto; overflow: visible; box-shadow: none; }
+.measure-host .sheet > .doc { height: auto; overflow: visible; }
+.measure-host .m0 { height: 0; margin: 0; padding: 0; }
 
+/* the block the editor caret is in */
+.sheet .is-current { outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent); outline-offset: 5px; border-radius: 2px; }
+.sheet .doc > * { cursor: default; }
+
+/* ---- typography ---------------------------------------------------------- */
 .doc {
   max-width: var(--measure);
   margin: 0 auto;
@@ -77,17 +73,12 @@
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   font-variant-numeric: oldstyle-nums proportional-nums;
+  overflow-wrap: break-word;
 }
-
 .doc > :first-child { margin-top: 0; }
 .doc > :last-child  { margin-bottom: 0; }
 
-/* ---- Headings ---------------------------------------------------------- */
-/* ---- Headings (per-level variables) ------------------------------------ */
-.doc h1, .doc h2, .doc h3, .doc h4, .doc h5, .doc h6 {
-  color: var(--ink);
-  text-wrap: balance;
-}
+.doc h1, .doc h2, .doc h3, .doc h4, .doc h5, .doc h6 { color: var(--ink); text-wrap: balance; }
 .doc h1 {
   font-family: var(--h1-font); font-size: var(--h1-size, 2.2em); font-weight: var(--h1-weight, 650);
   line-height: var(--h1-lh, 1.12); letter-spacing: var(--h1-track, -0.01em); text-transform: var(--h1-case, none);
@@ -112,159 +103,119 @@
   margin: var(--h4-space, 1.1em) 0 var(--h4-space-below, 0.5em);
   padding-bottom: calc(var(--h4-bar, 0) * 0.2em); border-bottom: calc(var(--h4-bar, 0) * 1px) solid var(--rule);
 }
-.doc h5 {
-  font-family: var(--h4-font); font-size: calc(var(--h4-size, 1em) * 0.92); font-weight: var(--h4-weight, 600);
-  line-height: 1.3; letter-spacing: var(--h4-track, 0); margin: 1em 0 0.45em;
-}
-.doc h6 {
-  font-family: var(--h4-font); font-size: calc(var(--h4-size, 1em) * 0.84); font-weight: 600;
-  line-height: 1.3; margin: 1em 0 0.45em;
-  color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em;
-}
+.doc h5 { font-family: var(--h4-font); font-size: calc(var(--h4-size, 1em) * 0.92); font-weight: var(--h4-weight, 600); line-height: 1.3; margin: 1em 0 0.45em; }
+.doc h6 { font-family: var(--h4-font); font-size: calc(var(--h4-size, 1em) * 0.84); font-weight: 600; line-height: 1.3; margin: 1em 0 0.45em; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
 
-/* ---- Body flow --------------------------------------------------------- */
-.doc ul, .doc ol, .doc blockquote, .doc pre, .doc table, .doc dl, .doc figure {
-  margin: 0 0 var(--para);
-}
+.doc ul, .doc ol, .doc blockquote, .doc pre, .doc table, .doc dl, .doc figure { margin: 0 0 var(--para); }
 .doc p {
   text-align: var(--body-align, justify); hyphens: auto; margin: var(--para-above, 0em) 0 var(--para);
   padding-bottom: calc(var(--body-bar, 0) * 0.25em); border-bottom: calc(var(--body-bar, 0) * 1px) solid var(--rule);
 }
-
-.doc a {
-  color: var(--link-color, var(--accent));
-  text-decoration-line: var(--link-deco, none);
-  text-decoration-thickness: 1px;
-  text-underline-offset: 2px;
-}
-.doc a:hover { text-decoration-line: underline; }
-
+.doc a { color: var(--link-color, var(--accent)); text-decoration-line: var(--link-deco, none); text-decoration-thickness: 1px; text-underline-offset: 2px; }
 .doc strong { font-weight: 700; }
 .doc em { font-style: italic; }
-.doc mark { background: color-mix(in srgb, var(--accent) 20%, transparent); color: inherit; padding: 0 .15em; border-radius: 2px; }
-.doc del { color: var(--muted); }
+.doc del, .doc s { color: var(--muted); }
 .doc small { font-size: 0.85em; color: var(--muted); }
+.doc sup, .doc sub { font-size: 0.72em; line-height: 0; }
 
-/* ---- Lists ------------------------------------------------------------- */
+/* lists */
 .doc ul, .doc ol { padding-left: var(--list-indent, 1.4em); }
 .doc li { margin: var(--list-gap, 0.25em) 0; }
 .doc li::marker { color: var(--list-marker, var(--muted)); }
 .doc ul ul, .doc ul ol, .doc ol ul, .doc ol ol { margin: 0.25em 0 0.25em; }
-
-/* GFM task lists */
+.doc li > p { margin: 0; }
 .doc li.task-list-item, .doc ul.contains-task-list { list-style: none; }
 .doc ul.contains-task-list { padding-left: 0.2em; }
 .doc li.task-list-item { padding-left: 1.7em; position: relative; }
 .doc li.task-list-item input[type="checkbox"] {
-  position: absolute; left: 0; top: 0.28em; width: 1em; height: 1em;
-  margin: 0; appearance: none; border: 1.5px solid var(--muted);
-  border-radius: 3px; background: var(--paper);
+  position: absolute; left: 0; top: 0.28em; width: 1em; height: 1em; margin: 0; appearance: none;
+  border: 1.5px solid var(--muted); border-radius: 3px; background: var(--paper);
 }
-.doc li.task-list-item input[type="checkbox"]:checked {
-  background: var(--accent); border-color: var(--accent);
-}
+.doc li.task-list-item input[type="checkbox"]:checked { background: var(--accent); border-color: var(--accent); }
 .doc li.task-list-item input[type="checkbox"]:checked::after {
-  content: ''; position: absolute; left: 0.27em; top: 0.08em;
-  width: 0.28em; height: 0.55em; border: solid var(--paper);
-  border-width: 0 0.14em 0.14em 0; transform: rotate(42deg);
+  content: ''; position: absolute; left: 0.27em; top: 0.08em; width: 0.28em; height: 0.55em;
+  border: solid var(--paper); border-width: 0 0.14em 0.14em 0; transform: rotate(42deg);
 }
 
-/* ---- Blockquote -------------------------------------------------------- */
+/* quote */
 .doc blockquote {
   border-left: var(--bq-border-w, 3px) solid var(--bq-border, var(--accent));
-  padding: 0.1em 0 0.1em 1.1em;
-  color: var(--bq-color, var(--muted));
-  font-style: var(--bq-style, italic);
+  padding: 0.1em 0 0.1em 1.1em; color: var(--bq-color, var(--muted)); font-style: var(--bq-style, italic);
 }
 .doc blockquote p { margin-bottom: 0.5em; }
 .doc blockquote > :last-child { margin-bottom: 0; }
 
-/* ---- Code -------------------------------------------------------------- */
+/* code */
 .doc code, .doc kbd, .doc pre, .doc samp { font-family: var(--font-mono); }
-.doc :not(pre) > code {
-  background: var(--code-bg);
-  font-size: 0.88em;
-  padding: 0.12em 0.36em;
-  border-radius: 4px;
-  color: color-mix(in srgb, var(--ink) 88%, var(--accent));
-}
+.doc :not(pre) > code { background: var(--code-bg); font-size: 0.88em; padding: 0.12em 0.36em; border-radius: 4px; color: color-mix(in srgb, var(--ink) 88%, var(--accent)); }
 .doc pre {
-  background: var(--code-bg);
-  border: 1px solid var(--rule);
-  border-radius: 6px;
-  padding: 0.9em 1.05em;
-  overflow-x: auto;
-  font-size: 0.85em;
-  line-height: 1.55;
+  background: var(--code-bg); border: calc(var(--code-border, 1) * 1px) solid var(--rule); border-radius: 6px;
+  padding: 0.9em 1.05em; overflow: hidden; font-size: var(--code-size, 0.85em); line-height: 1.55;
+  white-space: pre-wrap; overflow-wrap: anywhere;
 }
 .doc pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
-.doc kbd {
-  background: var(--code-bg); border: 1px solid var(--rule);
-  border-bottom-width: 2px; border-radius: 4px;
-  padding: 0.05em 0.4em; font-size: 0.82em;
-}
+.doc pre.split-head { border-bottom-style: dashed; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.doc pre.split-rest { border-top-style: dashed; border-top-left-radius: 0; border-top-right-radius: 0; }
+.doc kbd { background: var(--code-bg); border: 1px solid var(--rule); border-bottom-width: 2px; border-radius: 4px; padding: 0.05em 0.4em; font-size: 0.82em; }
 
-/* ---- Tables ------------------------------------------------------------ */
-.doc table { border-collapse: collapse; width: 100%; font-size: 0.94em; }
+/* tables */
+.doc table { border-collapse: collapse; width: 100%; font-size: var(--tbl-size, 0.94em); table-layout: auto; }
 .doc th, .doc td { border: 1px solid var(--tbl-border, var(--rule)); padding: var(--tbl-pad-y, 0.45em) var(--tbl-pad-x, 0.7em); text-align: left; vertical-align: top; }
 .doc thead th { background: var(--tbl-head-bg, var(--code-bg)); font-family: var(--font-head); font-weight: 650; }
-.doc tbody tr:nth-child(even) { background: color-mix(in srgb, var(--tbl-head-bg, var(--code-bg)) 45%, transparent); }
+.doc tbody tr:nth-child(even) { background: color-mix(in srgb, var(--tbl-head-bg, var(--code-bg)) calc(var(--tbl-stripe, 1) * 45%), transparent); }
+.doc table.split-head { margin-bottom: 0; }
+.doc table.split-rest { margin-top: 0; }
+.doc table.split-rest thead th { font-style: italic; }
 
-/* ---- Media / rules ----------------------------------------------------- */
-.doc img { width: var(--img-width, 100%); max-width: 100%; height: auto; border-radius: 3px; }
-.doc p > img:only-child, .doc > img { display: block; margin: 0.6em auto; }
-.doc figure { text-align: center; }
-.doc figcaption { font-size: 0.85em; color: var(--muted); margin-top: 0.4em; }
+/* media, captions, rules */
+.doc img { max-width: 100%; height: auto; border-radius: calc(var(--img-radius, 1) * 3px); vertical-align: middle; }
+.doc figure { width: var(--fig-width, 100%); max-width: 100%; margin: 0.4em auto var(--para); box-sizing: border-box; }
+.doc figure.align-left  { margin-left: 0; }
+.doc figure.align-right { margin-right: 0; }
+.doc figure > img { display: block; width: 100%; }
+.doc figcaption {
+  font-size: var(--cap-size, 0.85em); color: var(--cap-color, var(--muted)); font-style: var(--cap-style, normal);
+  text-align: var(--cap-align, center); margin-top: 0.45em; line-height: 1.4; hyphens: none;
+}
+.doc .img-missing {
+  display: inline-block; padding: 0.5em 0.9em; border: 1.5px dashed #b6bcc6; border-radius: 6px; background: #f5f6f8;
+  color: #5b6470; font-family: system-ui, sans-serif; font-size: 0.82rem; font-style: normal; line-height: 1.35;
+}
+.doc figure > .img-missing { display: block; }
 .doc hr { border: none; border-top: 1px solid var(--rule); margin: 1.8em 0; }
 
-.doc sup, .doc sub { font-size: 0.72em; }
+/* directives */
+.doc .vspace { height: calc(var(--n, 1) * var(--lh) * 1em); margin: 0; }
+.doc .pagebreak { height: 0; margin: 0; position: relative; }
+.sheet .doc .pagebreak::after {
+  content: 'page break'; position: absolute; left: 0; right: 0; top: 4px; border-top: 1.5px dashed #b8402a;
+  font: 600 9px/1.2 system-ui, sans-serif; letter-spacing: .06em; text-transform: uppercase; color: #b8402a; text-align: right; padding-top: 3px;
+}
+
+/* footnotes */
+.doc hr.footnotes-sep { margin: 1.6em 0 0.6em; width: 30%; }
+.doc section.footnotes { font-size: var(--fn-size, 0.82em); color: var(--fn-color, var(--muted)); }
+.doc section.footnotes ol { padding-left: 1.4em; }
+.doc section.footnotes li { margin: 0.2em 0; }
+.doc section.footnotes p { margin: 0; text-align: left; }
+.doc .footnote-ref a { text-decoration: none; }
+.doc .footnote-backref { text-decoration: none; margin-left: 0.3em; }
+.doc section.footnotes.split-rest hr { display: none; }
 
 /* ============================================================
-   Print — paginate the .page to true A4. Chrome is hidden.
-   Per-page margins come from an injected @page rule (see app).
+   Print — the same sheets, one per page, nothing else.
    ============================================================ */
 @media print {
-  html, body { background: #fff !important; }
-  .toolbar, .editor, .resizer, .drawer, .zoombar, .scrim { display: none !important; }
-  .preview { position: static !important; overflow: visible !important; padding: 0 !important; background: #fff !important; }
-  .page {
-    width: 100% !important;
-    min-height: 0 !important;
-    margin: 0 !important;
-    /* keep the page's own padding (var --pad-y/--pad-x) so margins match the editor
-       and the browser injects no header/footer (since @page margin is 0) */
-    box-shadow: none !important;
-    border-radius: 0 !important;
-    zoom: 1 !important;
+  html, body { background: #fff !important; margin: 0; }
+  .app { display: none !important; }
+  #print-root { display: block; }
+  #print-root .sheets { display: block; padding: 0; }
+  #print-root .sheet {
+    width: 210mm; height: 297mm; margin: 0; box-shadow: none; border-radius: 0; overflow: hidden;
+    break-after: page; page-break-after: always;
   }
-  .doc { max-width: none !important; width: 100% !important; padding: 0 !important; min-height: 0 !important; }
-  .sheet, .pg-spacer { display: none !important; }
+  #print-root .sheet:last-child { break-after: auto; page-break-after: auto; }
+  #print-root .sheet-label, #print-root .pagebreak::after, #print-root .sheet.overflows::after { display: none !important; }
+  #print-root .is-current { outline: none !important; }
   .doc img { max-width: 100% !important; }
-  .doc table { width: 100% !important; table-layout: fixed; }
-  .doc td, .doc th { overflow-wrap: anywhere; word-break: break-word; }
-  .doc h1, .doc h2, .doc h3, .doc h4 { break-after: avoid; }
-  .doc pre, .doc blockquote, .doc table, .doc figure, .doc img { break-inside: avoid; }
-  .doc tr, .doc li { break-inside: avoid; }
-}
-
-/* An image that is only a link (file://, blob:, a bare filename) can never be
-   painted here. Show it as an obvious, clickable placeholder instead of the
-   browser's broken-image icon, and never carry it into print. */
-.doc img.img-broken {
-  min-height: 92px;
-  padding: 26px 18px;
-  box-sizing: border-box;
-  border: 1.5px dashed #b6bcc6;
-  border-radius: 6px;
-  background: #f5f6f8;
-  cursor: pointer;
-  font-family: var(--body-font, system-ui, sans-serif);
-  font-size: 0.86rem;
-  font-style: normal;
-  text-align: center;
-  color: #5b6470;
-}
-.doc img.img-broken:hover { border-color: #2f64e6; color: #2f64e6; background: #eef2fd; }
-@media print {
-  .doc img.img-broken { display: none; }
 }

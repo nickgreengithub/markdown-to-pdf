@@ -1,0 +1,15 @@
+{
+  "name": "markdown-studio-tools",
+  "private": true,
+  "description": "Dev-only: bundles the editor libraries into ../vendor/editor-libs.js. The app itself has no build step.",
+  "type": "module",
+  "scripts": { "build": "node build-vendor.mjs" },
+  "devDependencies": {
+    "esbuild": "^0.24.0",
+    "codemirror": "^6.0.1",
+    "@codemirror/lang-markdown": "^6.3.0",
+    "@lezer/highlight": "^1.2.0",
+    "markdown-it": "^14.1.0",
+    "markdown-it-footnote": "^4.0.0"
+  }
+}

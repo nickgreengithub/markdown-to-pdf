@@ -1,4 +1,4 @@
-/* global React, Paginate */
+/* global React, Paginate, TARGET_LABEL */
 /* ============================================================
    Preview pane — the document on real A4 sheets, read-only.
 
@@ -112,6 +112,7 @@ function PreviewPane({ html, vars, mode, zoom, pageNumbers, currentLine, caretDr
   useEffectPV(() => { if (sheetsRef.current) applyCurrent(sheetsRef.current, currentLine, caretDriven); }, [currentLine, caretDriven]);
   function applyCurrent(sheets, line, scroll, instant) {
     sheets.querySelectorAll('.is-current').forEach((n) => n.classList.remove('is-current'));
+    sheets.querySelectorAll('.cur-tag').forEach((n) => n.remove());
     if (line == null) return;
     let best = null, span = Infinity;
     sheets.querySelectorAll('[data-line]').forEach((n) => {
@@ -125,6 +126,17 @@ function PreviewPane({ html, vars, mode, zoom, pageNumbers, currentLine, caretDr
     }
     if (!best) return;
     best.classList.add('is-current');
+    // a small tag above the frame's top-right corner saying what the block is
+    const doc = best.closest('.doc');
+    if (doc) {
+      sheets.querySelectorAll('.cur-tag').forEach((n) => n.remove());
+      const tag = document.createElement('span');
+      tag.className = 'cur-tag';
+      tag.textContent = TARGET_LABEL[targetOf(best)] || 'Block';
+      tag.style.top = (best.offsetTop - 26) + 'px';
+      tag.style.right = (doc.clientWidth - best.offsetLeft - best.offsetWidth - 7) + 'px';
+      doc.appendChild(tag);
+    }
     if (scroll) {
       const sc = scrollRef.current; if (!sc) return;
       const r = best.getBoundingClientRect(), h = sc.getBoundingClientRect();

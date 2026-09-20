@@ -1,14 +1,13 @@
-/* global React, CM, SYNTAX, FMT_ICONS, HelpIcon, LibraryIcon, CloseIcon */
+/* global React, CM, SYNTAX */
 /* ============================================================
    Markdown pane — the only place the document is edited.
 
    CodeMirror 6 with:
    - markdown syntax colouring (the raw marks stay raw)
-   - a gutter glyph per line saying what block it is; click it for help
-     and "change to…" options
-   - hover help on any construct
-   - "/" (or "\") at the start of a line lists every block type
-   - an insert toolbar and a syntax reference panel, both driven by SYNTAX
+   - hover help on any construct, with "change to…" for line-level ones
+   - "\" at the start of a line completes the layout directives
+   - a palette under the editor showing every construct at once; the one
+     under the caret lights up, and clicking one inserts it
    - paste / drop of image files handed to the app (→ image library)
    ============================================================ */
 const { useState: useStateMP, useEffect: useEffectMP, useRef: useRefMP } = React;
@@ -151,7 +150,6 @@ function helpDOM(view, itemId, lineNo) {
         const line = view.state.doc.line(lineNo + 1);
         view.dispatch({ selection: { anchor: line.from } });
         MD.setLinePrefix(view, o);
-        view.dispatch({ effects: setBlockTip.of(null) });
       };
       row.appendChild(b);
     });
@@ -183,20 +181,8 @@ function constructAt(view, pos) {
   return null;
 }
 
-/* gutter-click popover: a tooltip pinned to a line */
-const setBlockTip = CM.StateEffect.define();
-const blockTipField = CM.StateField.define({
-  create: () => null,
-  update(v, tr) {
-    for (const e of tr.effects) if (e.is(setBlockTip)) return e.value;
-    if (tr.docChanged && v) return null;
-    return v;
-  },
-  provide: (f) => CM.showTooltip.from(f),
-});
-
 function buildExtensions({ onDocChange, onCaret, onImageFiles, bus }) {
-  const { EditorView, keymap, lineNumbers, drawSelection, highlightActiveLine, highlightActiveLineGutter, Decoration, ViewPlugin, hoverTooltip, gutter, GutterMarker, placeholder,
+  const { EditorView, keymap, lineNumbers, drawSelection, highlightActiveLine, highlightActiveLineGutter, Decoration, ViewPlugin, hoverTooltip, placeholder,
     defaultKeymap, history, historyKeymap, indentWithTab, markdown, markdownLanguage, markdownKeymap, syntaxHighlighting, HighlightStyle, autocompletion, completionKeymap,
     searchKeymap, highlightSelectionMatches, tags: t, Prec } = CM;
 
@@ -219,14 +205,7 @@ function buildExtensions({ onDocChange, onCaret, onImageFiles, bus }) {
     { tag: t.labelName, color: 'var(--md-mark)' },
   ]);
 
-  /* gutter: one glyph per line, saying what it is */
-  class KindMarker extends GutterMarker {
-    constructor(id) { super(); this.id = id; }
-    eq(o) { return o.id === this.id; }
-    toDOM() { const s = document.createElement('span'); s.className = 'cm-kind cm-kind-' + this.id; s.textContent = SYNTAX.byId[this.id].glyph; s.title = SYNTAX.byId[this.id].label + ' — click for options'; return s; }
-  }
-  const markers = {};
-  const markerFor = (id) => (markers[id] || (markers[id] = new KindMarker(id)));
+  /* which lines are inside a fenced code block (they get a flat background) */
   let inFenceCache = { doc: null, lines: null };
   const fenceLines = (state) => {
     if (inFenceCache.doc === state.doc) return inFenceCache.lines;
@@ -239,32 +218,6 @@ function buildExtensions({ onDocChange, onCaret, onImageFiles, bus }) {
     inFenceCache = { doc: state.doc, lines: set };
     return set;
   };
-  const kindGutter = gutter({
-    class: 'cm-kind-gutter',
-    lineMarker(view, line) {
-      const fences = fenceLines(view.state);
-      const l = view.state.doc.lineAt(line.from);
-      if (fences.has(l.number)) return /^\s*(```|~~~)/.test(l.text) ? markerFor('fence') : null;
-      const id = SYNTAX.detectLine(l.text);
-      if (!id || id === 'p') return null;
-      return markerFor(id);
-    },
-    lineMarkerChange: (u) => u.docChanged,
-    domEventHandlers: {
-      mousedown(view, line, e) {
-        e.preventDefault();
-        const l = view.state.doc.lineAt(line.from);
-        const id = SYNTAX.detectLine(l.text) || 'p';
-        const cur = view.state.field(blockTipField);
-        if (cur && cur.pos === l.from) { view.dispatch({ effects: setBlockTip.of(null) }); return true; }
-        view.dispatch({
-          selection: { anchor: l.from },
-          effects: setBlockTip.of({ pos: l.from, above: false, strictSide: true, arrow: true, create: () => ({ dom: helpDOM(view, id, l.number - 1) || document.createElement('div') }) }),
-        });
-        return true;
-      },
-    },
-  });
 
   /* hover help */
   const hover = hoverTooltip((view, pos) => {
@@ -273,13 +226,12 @@ function buildExtensions({ onDocChange, onCaret, onImageFiles, bus }) {
     return { pos: c.from, end: c.to, above: true, create: () => ({ dom: helpDOM(view, c.id, c.line) || document.createElement('div') }) };
   }, { hoverTime: 350 });
 
-  /* directive lines + the "type / for blocks" hint on an empty active line */
+  /* directive lines and code-block lines get a background */
   const lineDeco = ViewPlugin.fromClass(class {
     constructor(view) { this.decorations = this.build(view); }
-    update(u) { if (u.docChanged || u.selectionSet || u.viewportChanged || u.focusChanged) this.decorations = this.build(u.view); }
+    update(u) { if (u.docChanged || u.viewportChanged) this.decorations = this.build(u.view); }
     build(view) {
       const b = new CM.RangeSetBuilder();
-      const cur = view.state.doc.lineAt(view.state.selection.main.head);
       const fences = fenceLines(view.state);
       for (const { from, to } of view.visibleRanges) {
         for (let pos = from; pos <= to;) {
@@ -287,8 +239,6 @@ function buildExtensions({ onDocChange, onCaret, onImageFiles, bus }) {
           if (!fences.has(line.number)) {
             if (/^\\pagebreak\s*$/.test(line.text)) b.add(line.from, line.from, Decoration.line({ class: 'cm-line-pagebreak' }));
             else if (/^\\(vspace(\s+\d+)?)?\s*$/.test(line.text)) b.add(line.from, line.from, Decoration.line({ class: 'cm-line-vspace' }));
-            else if (line.number === cur.number && !line.text && view.hasFocus && view.state.doc.length > 0)
-              b.add(line.from, line.from, Decoration.line({ class: 'cm-line-hint' }));
           } else if (!/^\s*(```|~~~)/.test(line.text)) b.add(line.from, line.from, Decoration.line({ class: 'cm-line-code' }));
           pos = line.to + 1;
         }
@@ -297,17 +247,16 @@ function buildExtensions({ onDocChange, onCaret, onImageFiles, bus }) {
     }
   }, { decorations: (v) => v.decorations });
 
-  /* "/" or "\" at the start of a line → block menu */
+  /* "\\" at the start of a line → the layout directives (completes what is being typed) */
   const blockSource = (ctx) => {
     const line = ctx.state.doc.lineAt(ctx.pos);
     const before = line.text.slice(0, ctx.pos - line.from);
-    const m = /^(\s*)([\/\\])([\w-]*)$/.exec(before);
-    if (!m && !ctx.explicit) return null;
-    const isDirective = m && m[2] === '\\';
-    // the trigger character stays out of the filter text; apply() removes it
-    const slashAt = m ? line.from + m[1].length : null;
-    const from = m ? slashAt + 1 : ctx.pos;
-    const items = SYNTAX.ITEMS.filter((i) => i.kind !== 'wrap' && i.id !== 'p' && (!isDirective || i.group === 'Page layout'));
+    const m = /^(\s*)(\\)([\w-]*)$/.exec(before);
+    if (!m) return null;
+    // the backslash stays out of the filter text; apply() removes it
+    const slashAt = line.from + m[1].length;
+    const from = slashAt + 1;
+    const items = SYNTAX.ITEMS.filter((i) => i.group === 'Layout');
     return {
       from,
       options: items.map((i) => ({
@@ -346,15 +295,14 @@ function buildExtensions({ onDocChange, onCaret, onImageFiles, bus }) {
   });
 
   const shortcuts = SYNTAX.ITEMS.filter((i) => i.key).map((i) => ({ key: i.key, run: (v) => { MD.apply(v, i); return true; } }));
-  shortcuts.push({ key: 'Escape', run: (v) => { if (v.state.field(blockTipField)) { v.dispatch({ effects: setBlockTip.of(null) }); return true; } return false; } });
 
   return [
-    lineNumbers(), kindGutter, highlightActiveLineGutter(), highlightActiveLine(), drawSelection(), history(),
+    lineNumbers(), highlightActiveLineGutter(), highlightActiveLine(), drawSelection(), history(),
     markdown({ base: markdownLanguage, addKeymap: true }),
     syntaxHighlighting(style),
     EditorView.lineWrapping,
-    placeholder('Start writing, or type / for a list of blocks. Paste an image anywhere.'),
-    lineDeco, hover, blockTipField,
+    placeholder('Start writing. Paste an image anywhere.'),
+    lineDeco, hover,
     autocompletion({ override: [blockSource], activateOnTyping: true, icons: false, maxRenderedOptions: 30, defaultKeymap: true }),
     highlightSelectionMatches(),
     events,
@@ -362,19 +310,24 @@ function buildExtensions({ onDocChange, onCaret, onImageFiles, bus }) {
     keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap, ...completionKeymap, indentWithTab]),
     EditorView.updateListener.of((u) => {
       if (u.docChanged) onDocChange(u.state.doc.toString());
-      if (u.docChanged || u.selectionSet) {
+      if (u.docChanged || u.selectionSet || u.focusChanged) {
         const head = u.state.selection.main.head;
-        onCaret(u.state.doc.lineAt(head).number - 1, u.view.hasFocus, u.docChanged);
+        const c = constructAt(u.view, head);
+        onCaret(u.state.doc.lineAt(head).number - 1, u.view.hasFocus, {
+          line: SYNTAX.detectLine(u.state.doc.lineAt(head).text) || 'p',
+          inline: c && !c.line ? c.id : null,
+        });
       }
     }),
   ];
 }
 
 /* ---------- the pane ---------- */
-function MarkdownPane({ initial, onDocChange, onCaret, onImageFiles, bus, onOpenLibrary, helpOpen, setHelpOpen }) {
+function MarkdownPane({ initial, onDocChange, onCaret, onImageFiles, bus, palette, setPalette }) {
   const host = useRefMP(null);
   const viewRef = useRefMP(null);
   const cbs = useRefMP({});
+  const [active, setActive] = useStateMP({ line: null, inline: null, focused: false });
   cbs.current = { onDocChange, onCaret, onImageFiles };
 
   useEffectMP(() => {
@@ -383,7 +336,7 @@ function MarkdownPane({ initial, onDocChange, onCaret, onImageFiles, bus, onOpen
         doc: initial,
         extensions: buildExtensions({
           onDocChange: (d) => cbs.current.onDocChange(d),
-          onCaret: (l, f, c) => cbs.current.onCaret(l, f, c),
+          onCaret: (l, f, at) => { setActive({ ...at, focused: f }); cbs.current.onCaret(l, f); },
           onImageFiles: (files, v) => cbs.current.onImageFiles(files, v),
         }),
       }),
@@ -397,6 +350,7 @@ function MarkdownPane({ initial, onDocChange, onCaret, onImageFiles, bus, onOpen
       apply: (id) => MD.apply(view, SYNTAX.byId[id]),
       insert: (text, own) => MD.insertAtCaret(view, text, own),
       focus: () => view.focus(),
+      blur: () => view.contentDOM.blur(),
       lineCount: () => view.state.doc.lines,
       getLine: (n) => (n >= 0 && n < view.state.doc.lines ? view.state.doc.line(n + 1).text : null),
       setLine: (n, text) => {
@@ -418,58 +372,41 @@ function MarkdownPane({ initial, onDocChange, onCaret, onImageFiles, bus, onOpen
     return () => { view.destroy(); bus.current.md = null; };
   }, []);
 
-  const tools = ['h1', 'h2', 'h3', '|', 'bold', 'italic', 'strike', '|', 'ul', 'ol', 'quote', '|', 'table', 'link', 'image', '|', 'pagebreak', 'vspace'];
-  const run = (id) => { const v = viewRef.current; if (!v) return; if (id === 'image') { onOpenLibrary(); return; } MD.apply(v, SYNTAX.byId[id]); };
-
+  const run = (id) => { const v = viewRef.current; if (v) MD.apply(v, SYNTAX.byId[id]); };
   return (
     <div className="mdpane">
-      <div className="mdbar">
-        <div className="mdbar-tools">
-          {tools.map((id, i) => id === '|'
-            ? <span key={i} className="fmt-sep" />
-            : (() => { const it = SYNTAX.byId[id]; const Ico = it.tool && FMT_ICONS[it.tool]; return (
-              <button key={id} className={'fmt' + (Ico ? ' ico' : ' h')} title={it.label + (it.key ? '  (' + it.key.replace('Mod', navigator.platform.includes('Mac') ? '⌘' : 'Ctrl') + ')' : '') + ' — ' + it.syntax.split('\n')[0]}
-                onMouseDown={(e) => { e.preventDefault(); run(id); }}>
-                {Ico ? <Ico /> : it.tool || it.glyph}
-              </button>); })())}
-        </div>
-        <div className="mdbar-right">
-          <button className="fmt ico" title="Image library" onMouseDown={(e) => { e.preventDefault(); onOpenLibrary(); }}><LibraryIcon /></button>
-          <button className={'fmt ico' + (helpOpen ? ' active' : '')} title="Syntax reference" onMouseDown={(e) => { e.preventDefault(); setHelpOpen(!helpOpen); }}><HelpIcon /></button>
-        </div>
-      </div>
-      <div className="mdbody">
-        <div className="cm-host" ref={host} />
-        {helpOpen && <SyntaxReference onInsert={(id) => run(id)} onClose={() => setHelpOpen(false)} />}
-      </div>
+      <div className="cm-host" ref={host} />
+      <Palette active={active} onInsert={run} mode={palette} setMode={setPalette} />
     </div>
   );
 }
 
-function SyntaxReference({ onInsert, onClose }) {
+/* Every construct, always visible. The chip for the construct under the
+   caret is lit; clicking a chip inserts or toggles it. */
+function Palette({ active, onInsert, mode, setMode }) {
+  const isMac = navigator.platform.includes('Mac');
+  const lit = (it) => active.focused && (it.id === active.line || it.id === active.inline || (it.id === 'vspace' && active.line === 'vspaceN'));
   return (
-    <div className="mdhelp">
-      <div className="mdhelp-head">
-        <span>Syntax reference</span>
-        <button className="fmt ico" onClick={onClose} title="Close"><CloseIcon /></button>
-      </div>
-      <div className="mdhelp-intro">Click any entry to insert it at the caret. Type <code>/</code> at the start of a line for the same list.</div>
-      <div className="mdhelp-scroll">
+    <div className={'palette' + (mode === 'compact' ? ' compact' : '')}>
+      <div className="pal-groups">
         {SYNTAX.GROUPS.map((g) => (
-          <div className="mdhelp-group" key={g.label}>
-            <div className="mdhelp-gtitle">{g.label}</div>
+          <div className="pal-group" key={g.label}>
+            <span className="pal-glabel">{g.label}</span>
             {g.items.map((it) => (
-              <button className="mdhelp-row" key={it.id} onMouseDown={(e) => { e.preventDefault(); onInsert(it.id); }} title={it.desc.replace(/`/g, '')}>
-                <span className="mdhelp-glyph">{it.glyph}</span>
-                <span className="mdhelp-text">
-                  <span className="mdhelp-label">{it.label}</span>
-                  <code className="mdhelp-syntax">{it.syntax.split('\n').map((l, i) => <span key={i}>{l}{i < it.syntax.split('\n').length - 1 ? <span className="mdhelp-nl">⏎</span> : null}</span>)}</code>
-                </span>
+              <button key={it.id} className={'pal-chip' + (lit(it) ? ' on' : '')}
+                title={it.desc.replace(/`/g, '') + (it.key ? '  (' + it.key.replace('Mod', isMac ? '⌘' : 'Ctrl') + ')' : '')}
+                onMouseDown={(e) => { e.preventDefault(); onInsert(it.id); }}>
+                <span className="pal-glyph">{it.glyph}</span>
+                <span className="pal-label">{it.label}</span>
+                <code className="pal-syntax">{it.syntax.split('\n')[0]}</code>
               </button>
             ))}
           </div>
         ))}
       </div>
+      <button className="pal-toggle" title={mode === 'compact' ? 'Show syntax' : 'Compact'} onMouseDown={(e) => { e.preventDefault(); setMode(mode === 'compact' ? 'full' : 'compact'); }}>
+        {mode === 'compact' ? '▴' : '▾'}
+      </button>
     </div>
   );
 }

@@ -304,7 +304,9 @@ function buildExtensions({ onDocChange, onCaret, onImageFiles, bus }) {
     const m = /^(\s*)([\/\\])([\w-]*)$/.exec(before);
     if (!m && !ctx.explicit) return null;
     const isDirective = m && m[2] === '\\';
-    const from = m ? line.from + m[1].length : ctx.pos;
+    // the trigger character stays out of the filter text; apply() removes it
+    const slashAt = m ? line.from + m[1].length : null;
+    const from = m ? slashAt + 1 : ctx.pos;
     const items = SYNTAX.ITEMS.filter((i) => i.kind !== 'wrap' && i.id !== 'p' && (!isDirective || i.group === 'Page layout'));
     return {
       from,
@@ -312,7 +314,7 @@ function buildExtensions({ onDocChange, onCaret, onImageFiles, bus }) {
         label: i.label, detail: i.syntax.split('\n')[0], type: 'block', info: i.desc.replace(/`/g, ''),
         boost: i.group === 'Headings' ? 2 : 0,
         apply: (view, c, f, to) => {
-          view.dispatch({ changes: { from: f, to, insert: '' } });
+          view.dispatch({ changes: { from: slashAt != null ? slashAt : f, to, insert: '' } });
           MD.apply(view, i);
         },
       })),

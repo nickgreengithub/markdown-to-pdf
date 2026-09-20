@@ -50,6 +50,14 @@ function PreviewPane({ html, vars, mode, zoom, pageNumbers, currentLine, caretDr
   const [busy, setBusy] = useStatePV(false);
   const [overflow, setOverflow] = useStatePV(0);
   const [fit, setFit] = useStatePV(1);
+  const [fontTick, setFontTick] = useStatePV(0);
+  // web fonts arriving after the first layout change every height: paginate again
+  useEffectPV(() => {
+    if (!document.fonts || !document.fonts.addEventListener) return;
+    const on = () => setFontTick((t) => t + 1);
+    document.fonts.addEventListener('loadingdone', on);
+    return () => document.fonts.removeEventListener('loadingdone', on);
+  }, []);
 
   // fit zoom: N sheets across the available width
   useLayoutEffectPV(() => {
@@ -89,17 +97,20 @@ function PreviewPane({ html, vars, mode, zoom, pageNumbers, currentLine, caretDr
         setOverflow(res.overflow);
         const n = sheets.querySelectorAll(':scope > .sheet').length;
         if (onPages) onPages(n, sheets.innerText);
-        applyCurrent(sheets, currentLineRef.current, false);
+        // while the author is typing, keep the block under the caret in view
+        applyCurrent(sheets, currentLineRef.current, caretDrivenRef.current, true);
       } finally { if (token()) setBusy(false); }
     }, 120);
     return () => { cancelled = true; clearTimeout(t); };
-  }, [html, vars, pageNumbers]);
+  }, [html, vars, pageNumbers, fontTick]);
 
   // current-block highlight from the editor caret
   const currentLineRef = useRefPV(currentLine);
   currentLineRef.current = currentLine;
+  const caretDrivenRef = useRefPV(caretDriven);
+  caretDrivenRef.current = caretDriven;
   useEffectPV(() => { if (sheetsRef.current) applyCurrent(sheetsRef.current, currentLine, caretDriven); }, [currentLine, caretDriven]);
-  function applyCurrent(sheets, line, scroll) {
+  function applyCurrent(sheets, line, scroll, instant) {
     sheets.querySelectorAll('.is-current').forEach((n) => n.classList.remove('is-current'));
     if (line == null) return;
     let best = null, span = Infinity;
@@ -117,7 +128,7 @@ function PreviewPane({ html, vars, mode, zoom, pageNumbers, currentLine, caretDr
     if (scroll) {
       const sc = scrollRef.current; if (!sc) return;
       const r = best.getBoundingClientRect(), h = sc.getBoundingClientRect();
-      if (r.top < h.top + 40 || r.bottom > h.bottom - 40) best.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      if (r.top < h.top + 40 || r.bottom > h.bottom - 40) best.scrollIntoView({ block: 'center', behavior: instant ? 'auto' : 'smooth' });
     }
   }
 

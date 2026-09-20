@@ -123,7 +123,12 @@ window.expandTheme = function (v) {
     'list-marker': v['list-marker'] || v['muted'], 'list-gap': v['list-gap'] || '0.25em', 'list-indent': v['list-indent'] || '1.4em',
     'tbl-head-bg': v['tbl-head-bg'] || v['code-bg'], 'tbl-border': v['tbl-border'] || v['rule'],
     'tbl-pad-y': v['tbl-pad-y'] || '0.45em', 'tbl-pad-x': v['tbl-pad-x'] || '0.7em',
-    'img-width': v['img-width'] || '100%',
+    'img-width': v['img-width'] || '100%', 'img-radius': v['img-radius'] || '1',
+    'body-align': v['body-align'] || 'justify',
+    'tbl-size': v['tbl-size'] || '0.94em', 'tbl-stripe': v['tbl-stripe'] || '1',
+    'code-size': v['code-size'] || '0.85em', 'code-border': v['code-border'] || '1',
+    'cap-size': v['cap-size'] || '0.85em', 'cap-color': v['cap-color'] || v['muted'], 'cap-style': v['cap-style'] || 'normal', 'cap-align': v['cap-align'] || 'center',
+    'fn-size': v['fn-size'] || '0.82em', 'fn-color': v['fn-color'] || v['muted'],
   };
   ['h1', 'h2', 'h3', 'h4'].forEach((L) => {
     out[L + '-font'] = v['font-head'];
@@ -151,6 +156,7 @@ window.CSS_ORDER = [
   'link-color', 'link-deco',
   'list-marker', 'list-gap', 'list-indent',
   'tbl-head-bg', 'tbl-border', 'tbl-pad-y', 'tbl-pad-x',
-  'img-width',
+  'img-width', 'img-radius', 'body-align', 'tbl-size', 'tbl-stripe', 'code-size', 'code-border',
+  'cap-size', 'cap-color', 'cap-style', 'cap-align', 'fn-size', 'fn-color',
   'pad-y', 'pad-x', 'measure', 'ink', 'paper', 'accent', 'muted', 'rule', 'code-bg',
 ];

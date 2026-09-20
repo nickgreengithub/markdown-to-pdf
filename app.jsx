@@ -329,13 +329,14 @@ function App() {
         </div>
         <div className="divider" onMouseDown={onDividerDown} title="Drag to resize" />
         <div className="pane pane-pv">
+          <div className="pane-head pane-head-pv">
+            <span className="pane-title">Preview</span>
+            <span className="pane-note">A4 · {stats.pages} {stats.pages === 1 ? 'page' : 'pages'} · {stats.words} words</span>
+            <span className="pane-hint">Click anything on the page to style it</span>
+          </div>
           <PreviewPane html={html} vars={pageVars} mode={ui.mode} zoom={ui.zoom} pageNumbers={ui.pageNumbers}
             currentLine={highlightLine} caretDriven={editorFocused} onBlockClick={onBlockClick} onScrollLine={onScrollLine}
             onPages={onPages} onFitZoom={(z) => { fitRef.current = z; if (ui.zoom == null) setUi((u) => ({ ...u })); }} bus={bus} />
-          <div className="pvfoot">
-            <span>A4 · {stats.pages} {stats.pages === 1 ? 'page' : 'pages'} · {stats.words} words</span>
-            <span className="pvfoot-hint">Click anything on the page to style it</span>
-          </div>
         </div>
       </div>
 

@@ -373,40 +373,42 @@ function MarkdownPane({ initial, onDocChange, onCaret, onImageFiles, bus, palett
   }, []);
 
   const run = (id) => { const v = viewRef.current; if (v) MD.apply(v, SYNTAX.byId[id]); };
+  const open = palette !== 'hidden';
   return (
     <div className="mdpane">
-      <div className="cm-host" ref={host} />
-      <Palette active={active} onInsert={run} mode={palette} setMode={setPalette} />
+      <div className="pane-head">
+        <button className={'pane-tab' + (open ? ' on' : '')} title={open ? 'Hide the syntax column' : 'Show the syntax column'} onMouseDown={(e) => { e.preventDefault(); setPalette(open ? 'hidden' : 'full'); }}>Syntax</button>
+        <span className="pane-title">Markdown</span>
+        <span className="pane-note">{active.focused ? (SYNTAX.byId[active.inline || active.line] || {}).label || '' : ''}</span>
+      </div>
+      <div className="mdbody">
+        {open && <Palette active={active} onInsert={run} />}
+        <div className="cm-host" ref={host} />
+      </div>
     </div>
   );
 }
 
-/* Every construct, always visible. The chip for the construct under the
-   caret is lit; clicking a chip inserts or toggles it. */
-function Palette({ active, onInsert, mode, setMode }) {
+/* One column, one row per construct: the syntax you type, lit when the
+   caret is in it. A note only where the symbol alone says nothing. */
+function Palette({ active, onInsert }) {
   const isMac = navigator.platform.includes('Mac');
   const lit = (it) => active.focused && (it.id === active.line || it.id === active.inline || (it.id === 'vspace' && active.line === 'vspaceN'));
   return (
-    <div className={'palette' + (mode === 'compact' ? ' compact' : '')}>
-      <div className="pal-groups">
-        {SYNTAX.GROUPS.map((g) => (
-          <div className="pal-group" key={g.label}>
-            <span className="pal-glabel">{g.label}</span>
-            {g.items.map((it) => (
-              <button key={it.id} className={'pal-chip' + (lit(it) ? ' on' : '')}
-                title={it.desc.replace(/`/g, '') + (it.key ? '  (' + it.key.replace('Mod', isMac ? '⌘' : 'Ctrl') + ')' : '')}
-                onMouseDown={(e) => { e.preventDefault(); onInsert(it.id); }}>
-                <span className="pal-glyph">{it.glyph}</span>
-                <span className="pal-label">{it.label}</span>
-                <code className="pal-syntax">{it.syntax.split('\n')[0]}</code>
-              </button>
-            ))}
-          </div>
-        ))}
-      </div>
-      <button className="pal-toggle" title={mode === 'compact' ? 'Show syntax' : 'Compact'} onMouseDown={(e) => { e.preventDefault(); setMode(mode === 'compact' ? 'full' : 'compact'); }}>
-        {mode === 'compact' ? '▴' : '▾'}
-      </button>
-    </div>
+    <aside className="palette">
+      {SYNTAX.GROUPS.map((g) => (
+        <div className="pal-group" key={g.label}>
+          <div className="pal-glabel">{g.label}</div>
+          {g.items.map((it) => (
+            <button key={it.id} className={'pal-row' + (lit(it) ? ' on' : '')}
+              title={it.label + ' — ' + it.desc.replace(/`/g, '') + (it.key ? '  (' + it.key.replace('Mod', isMac ? '⌘' : 'Ctrl') + ')' : '')}
+              onMouseDown={(e) => { e.preventDefault(); onInsert(it.id); }}>
+              <code className="pal-syntax">{it.syntax.split('\n')[0]}</code>
+              {it.note && <span className="pal-note">{it.note}</span>}
+            </button>
+          ))}
+        </div>
+      ))}
+    </aside>
   );
 }

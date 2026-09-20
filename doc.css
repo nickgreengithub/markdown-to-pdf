@@ -36,7 +36,7 @@
 .sheet-label {
   position: absolute; right: 0; top: -22px; padding: 2px 9px; border-radius: 99px;
   font: 600 9.5px/1.4 system-ui, sans-serif; letter-spacing: .04em;
-  color: #6b7280; background: rgba(255,255,255,.7); pointer-events: none;
+  color: #fff; background: rgba(0,0,0,.28); pointer-events: none;
 }
 .sheet.overflows::after {
   content: 'clipped'; position: absolute; right: 8px; bottom: 8px; padding: 2px 8px; border-radius: 99px;
@@ -56,8 +56,13 @@
 .measure-host .sheet > .doc { height: auto; overflow: visible; }
 .measure-host .m0 { height: 0; margin: 0; padding: 0; }
 
-/* the block the editor caret is in */
+/* the block the editor caret is in, and its tag above the frame */
 .sheet .is-current { outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent); outline-offset: 5px; border-radius: 2px; }
+.sheet .cur-tag {
+  position: absolute; padding: 1px 7px; border-radius: 99px; pointer-events: none; z-index: 3;
+  font: 600 9px/1.5 system-ui, sans-serif; letter-spacing: .05em; text-transform: uppercase;
+  color: #fff; background: color-mix(in srgb, var(--accent) 80%, #000); white-space: nowrap;
+}
 .sheet .doc > * { cursor: default; }
 
 /* ---- typography ---------------------------------------------------------- */
@@ -217,5 +222,6 @@
   #print-root .sheet:last-child { break-after: auto; page-break-after: auto; }
   #print-root .sheet-label, #print-root .pagebreak::after, #print-root .sheet.overflows::after { display: none !important; }
   #print-root .is-current { outline: none !important; }
+  #print-root .cur-tag { display: none !important; }
   .doc img { max-width: 100% !important; }
 }

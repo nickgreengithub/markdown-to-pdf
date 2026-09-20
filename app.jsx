@@ -1,4 +1,4 @@
-/* global React, ReactDOM, THEMES, expandTheme, Dialect, Library, DEMO, MarkdownPane, PreviewPane, StylePopover, HoverMenu, RowStep, Toggle, RowIcon, LogoMark, PrintIcon, SingleIcon, SpreadIcon, GridIcon, CloseIcon, TurndownService, turndownPluginGfm */
+/* global React, ReactDOM, THEMES, expandTheme, Dialect, Library, DEMO, MarkdownPane, PreviewPane, StylePopover, HoverMenu, RowStep, Toggle, RowIcon, LogoMark, PrintIcon, SingleIcon, SpreadIcon, GridIcon, CloseIcon, LibraryIcon, TurndownService, turndownPluginGfm */
 /* ============================================================
    App — top bar, the two panes, persistence, print.
    Markdown text is the only source of truth; everything else derives.
@@ -112,12 +112,12 @@ function App() {
     const base = expandTheme(getTheme(get(LS.theme, get('mdv2.theme', t0.id))).vars);
     return persisted ? { ...base, ...persisted, paper: '#ffffff' } : base;
   });
-  const [ui, setUi] = useState(() => ({ mode: 'single', zoom: null, split: 0.42, help: false, pageNumbers: 'none', narrow: 'md', ...getJSON(LS.ui, {}) }));
+  const [ui, setUi] = useState(() => ({ mode: 'single', zoom: null, split: 0.42, palette: 'full', pageNumbers: 'none', narrow: 'md', ...getJSON(LS.ui, {}) }));
   const [libOpen, setLibOpen] = useState(false);
   const [toast, setToast] = useState('');
   const [stats, setStats] = useState({ pages: 1, words: 0 });
-  const [currentLine, setCurrentLine] = useState(null); // no outline until the author interacts
-  const [caretDriven, setCaretDriven] = useState(false);
+  const [currentLine, setCurrentLine] = useState(null);
+  const [editorFocused, setEditorFocused] = useState(false);
   const [popover, setPopover] = useState(null);
   const bus = useRef({});
   const fitRef = useRef(1);
@@ -182,11 +182,13 @@ function App() {
   const onBlockClick = (info) => {
     if (!info) { setPopover(null); return; }
     if (bus.current.md) bus.current.md.gotoLine(info.line, { y: 'center' });
-    setCurrentLine(info.line); setCaretDriven(false);
+    setCurrentLine(info.line);
     const r = info.anchor.getBoundingClientRect();
     setPopover({ target: info.kind, line: info.line, lineEnd: info.lineEnd, imgName: info.imgName, anchorRect: { left: r.left, top: r.top, right: r.right, bottom: r.bottom } });
   };
-  const onCaret = useCallback((line, focused) => { setCurrentLine(line); setCaretDriven(focused); }, []);
+  const onCaret = useCallback((line, focused) => { setCurrentLine(line); setEditorFocused(focused); }, []);
+  // the outline on the page exists only while the editor has focus or a popover is open
+  const highlightLine = popover ? popover.line : (editorFocused ? currentLine : null);
   const onScrollLine = useCallback((line) => { if (bus.current.md && !bus.current.md.view.hasFocus) bus.current.md.scrollToLine(line); }, []);
   const onPages = useCallback((n, text) => setStats({ pages: n, words: (text.trim().match(/\S+/g) || []).length }), []);
 
@@ -212,6 +214,7 @@ function App() {
     const pr = document.createElement('div'); pr.id = 'print-root';
     Object.keys(vars).forEach((k) => pr.style.setProperty('--' + k, vars[k]));
     clone.querySelectorAll('.is-current').forEach((n) => n.classList.remove('is-current'));
+    clone.querySelectorAll('.cur-tag').forEach((n) => n.remove());
     pr.appendChild(clone);
     document.body.appendChild(pr);
     const cleanup = () => { const n = document.getElementById('print-root'); if (n) n.remove(); window.removeEventListener('afterprint', cleanup); };
@@ -262,6 +265,7 @@ function App() {
       <header className="topbar">
         <div className="tb-left">
           <span className="brand"><LogoMark /><span>Markdown Studio</span></span>
+          <button className="fmt tb-btn" title="Image library" onClick={() => setLibOpen(true)}><LibraryIcon /><span>Images</span></button>
           <HoverMenu className="tsel-menu" button={<span>Document</span>}>
             {(close) => (
               <div className="tsel-group">
@@ -321,12 +325,12 @@ function App() {
       <div className="split" ref={splitRef}>
         <div className="pane pane-md" style={{ width: (ui.split * 100) + '%' }}>
           <MarkdownPane initial={initialMd} bus={bus} onDocChange={setMd} onCaret={onCaret} onImageFiles={(files) => addImages(files)}
-            onOpenLibrary={() => setLibOpen(true)} helpOpen={ui.help} setHelpOpen={(h) => setU({ help: h })} />
+            palette={ui.palette} setPalette={(m) => setU({ palette: m })} />
         </div>
         <div className="divider" onMouseDown={onDividerDown} title="Drag to resize" />
         <div className="pane pane-pv">
           <PreviewPane html={html} vars={pageVars} mode={ui.mode} zoom={ui.zoom} pageNumbers={ui.pageNumbers}
-            currentLine={currentLine} caretDriven={caretDriven} onBlockClick={onBlockClick} onScrollLine={onScrollLine}
+            currentLine={highlightLine} caretDriven={editorFocused} onBlockClick={onBlockClick} onScrollLine={onScrollLine}
             onPages={onPages} onFitZoom={(z) => { fitRef.current = z; if (ui.zoom == null) setUi((u) => ({ ...u })); }} bus={bus} />
           <div className="pvfoot">
             <span>A4 · {stats.pages} {stats.pages === 1 ? 'page' : 'pages'} · {stats.words} words</span>

@@ -9,7 +9,7 @@
           'block'    a multi-line template inserted on its own lines
    ============================================================ */
 window.SYNTAX = (() => {
-  const G = { text: 'Text', headings: 'Headings', lists: 'Lists', blocks: 'Blocks', media: 'Media', layout: 'Page layout' };
+  const G = { text: 'Text', headings: 'Headings', lists: 'Lists', blocks: 'Blocks', media: 'Media', layout: 'Layout' };
   const ITEMS = [
     { id: 'p',  group: G.text, kind: 'prefix', prefix: '', glyph: '¶', label: 'Body text', syntax: 'plain text', desc: 'A paragraph. Leave one blank line between paragraphs.', tool: 'Body' },
     { id: 'h1', group: G.headings, kind: 'prefix', prefix: '# ',    glyph: 'H1', label: 'Heading 1', syntax: '# Heading',    desc: 'The document title. Use once.', tool: 'H1' },
@@ -38,11 +38,11 @@ window.SYNTAX = (() => {
     { id: 'imageAttrs', group: G.media, kind: 'wrap', open: '', close: '{width=50% align=right}', glyph: '⇔', label: 'Image size & alignment', syntax: '![…](name "…"){width=50% align=right}', desc: 'Directly after an image: `width=` 25%–100%, `align=` left, center or right. The style popover in the preview writes these for you.' },
 
     { id: 'pagebreak', group: G.layout, kind: 'line', line: '\\pagebreak', glyph: '⤓', label: 'Page break', syntax: '\\pagebreak', desc: 'Everything after this line starts on a new page.', tool: 'pagebreak' },
-    { id: 'vspace',    group: G.layout, kind: 'line', line: '\\', glyph: '␣', label: 'Blank line', syntax: '\\', desc: 'A backslash alone on a line leaves one blank line of space. Repeat it for more, or write `\\vspace 3` for three. Space that would fall at the very end of a page is dropped.', tool: 'vspace' },
-    { id: 'vspaceN',   group: G.layout, kind: 'line', line: '\\vspace 3', glyph: '␣₃', label: 'Vertical space', syntax: '\\vspace 3', desc: 'Three blank lines of space (any number from 1 to 99).' },
+    { id: 'vspace',    group: G.layout, kind: 'line', line: '\\', glyph: '␣', label: 'Blank line', syntax: '\\  ·  \\vspace 3', desc: 'A backslash alone on a line leaves one blank line of space. Repeat it for more, or write `\\vspace 3` for three. Space that would fall at the very end of a page is dropped.', tool: 'vspace' },
+    { id: 'vspaceN',   group: G.layout, kind: 'line', line: '\\vspace 3', glyph: '␣₃', label: 'Vertical space', syntax: '\\vspace 3', desc: 'Three blank lines of space (any number from 1 to 99).', hidden: true },
   ];
   const byId = Object.fromEntries(ITEMS.map((i) => [i.id, i]));
-  const GROUPS = [G.headings, G.text, G.lists, G.blocks, G.media, G.layout].map((g) => ({ label: g, items: ITEMS.filter((i) => i.group === g) }));
+  const GROUPS = [G.headings, G.text, G.lists, G.blocks, G.media, G.layout].map((g) => ({ label: g, items: ITEMS.filter((i) => i.group === g && !i.hidden) }));
 
   /* what block a source line is, from its text alone */
   function detectLine(text) {

@@ -246,3 +246,25 @@
   .doc pre, .doc blockquote, .doc table, .doc figure, .doc img { break-inside: avoid; }
   .doc tr, .doc li { break-inside: avoid; }
 }
+
+/* An image that is only a link (file://, blob:, a bare filename) can never be
+   painted here. Show it as an obvious, clickable placeholder instead of the
+   browser's broken-image icon, and never carry it into print. */
+.doc img.img-broken {
+  min-height: 92px;
+  padding: 26px 18px;
+  box-sizing: border-box;
+  border: 1.5px dashed #b6bcc6;
+  border-radius: 6px;
+  background: #f5f6f8;
+  cursor: pointer;
+  font-family: var(--body-font, system-ui, sans-serif);
+  font-size: 0.86rem;
+  font-style: normal;
+  text-align: center;
+  color: #5b6470;
+}
+.doc img.img-broken:hover { border-color: #2f64e6; color: #2f64e6; background: #eef2fd; }
+@media print {
+  .doc img.img-broken { display: none; }
+}

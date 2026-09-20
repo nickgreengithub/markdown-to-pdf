@@ -4,7 +4,7 @@ const { useState, useEffect, useRef, useCallback, forwardRef, memo } = React;
 const LS = { html: 'mdv4.html', theme: 'mdv2.theme', vars: 'mdv2.vars', zoom: 'mdv2.zoom3', rawZoom: 'mdv2.rawZoom2', open: 'mdv2.open', side: 'mdv2.side', seed: 'mdv.seed' };
 const get = (k, f) => { try { const v = localStorage.getItem(k); return v == null ? f : v; } catch { return f; } };
 const getJSON = (k, f) => { try { const v = localStorage.getItem(k); return v == null ? f : JSON.parse(v); } catch { return f; } };
-const set = (k, v) => { try { localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v)); } catch {} };
+const set = (k, v) => { try { localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v)); return true; } catch { return false; } };
 
 /* One-time seed: clear any previously saved document so the bundled sample shows.
    Bump SEED_VERSION whenever the default sample should be re-seeded. */
@@ -89,6 +89,80 @@ function htmlToMD(html) {
     if (window.turndownPluginGfm) _td.use(window.turndownPluginGfm.gfm);
   }
   return _td.turndown(html || '');
+}
+
+/* ----- images: carry the pixels, never a reference ----------------------
+   A pasted <img> usually arrives as a link (file://, blob:, a relative name
+   like image.png) that only resolves in the app it came from — in here it is
+   a broken icon. Every image that enters the document is therefore turned
+   into a data: URL, and anything that can't be is flagged for the user. */
+const MAX_IMG_PX = 1800;        // longest edge we keep (print is 300dpi at ~A4 width)
+const MAX_IMG_BYTES = 1400000;  // past this we re-encode, so autosave still fits
+
+const fileToDataURL = (file) => new Promise((res, rej) => {
+  const fr = new FileReader();
+  fr.onload = () => res(String(fr.result));
+  fr.onerror = () => rej(fr.error || new Error('read failed'));
+  fr.readAsDataURL(file);
+});
+const isInlineSrc = (s) => /^data:image\//i.test(String(s || ''));
+
+/* Re-encode an oversized image: a 12MP phone screenshot is ~8MB of base64,
+   which blows the localStorage quota and makes pagination crawl. */
+function shrinkDataURL(url) {
+  return new Promise((res) => {
+    if (!isInlineSrc(url)) return res(url);
+    if (/^data:image\/(svg|gif)/i.test(url)) return res(url); // vector / animation: leave alone
+    const im = new Image();
+    im.onload = () => {
+      const long = Math.max(im.naturalWidth, im.naturalHeight);
+      if (long <= MAX_IMG_PX && url.length <= MAX_IMG_BYTES) return res(url);
+      try {
+        const k = Math.min(1, MAX_IMG_PX / long);
+        const cv = document.createElement('canvas');
+        cv.width = Math.max(1, Math.round(im.naturalWidth * k));
+        cv.height = Math.max(1, Math.round(im.naturalHeight * k));
+        cv.getContext('2d').drawImage(im, 0, 0, cv.width, cv.height);
+        const keepAlpha = /^data:image\/(png|webp)/i.test(url);
+        const out = cv.toDataURL(keepAlpha ? 'image/png' : 'image/jpeg', 0.92);
+        res(out && out.length < url.length ? out : url);
+      } catch { res(url); }
+    };
+    im.onerror = () => res(url);
+    im.src = url;
+  });
+}
+
+/* Try to pull a referenced image in as pixels. http(s) can be fetched (CORS
+   permitting); blob:/file:/relative belong to another document and cannot. */
+async function inlineImageSrc(src) {
+  const url = String(src || '');
+  if (isInlineSrc(url)) return url;
+  if (!/^https?:/i.test(url)) return null;
+  try {
+    const r = await fetch(url, { mode: 'cors', credentials: 'omit' });
+    if (!r.ok) return null;
+    const b = await r.blob();
+    if (!/^image\//i.test(b.type)) return null;
+    return await shrinkDataURL(await fileToDataURL(b));
+  } catch { return null; }
+}
+
+/* First image file on a clipboard/drag payload, checking both shapes:
+   Safari populates .files, Chrome .items, and a drag from a file manager
+   can carry a text/html decoy alongside the real file. */
+function imageFileFrom(dt) {
+  if (!dt) return null;
+  const files = dt.files || [];
+  for (const f of files) if (f && /^image\//i.test(f.type)) return f;
+  const items = dt.items || [];
+  for (const it of items) {
+    if (it && it.kind === 'file' && /^image\//i.test(it.type || '')) {
+      const f = it.getAsFile();
+      if (f) return f;
+    }
+  }
+  return null;
 }
 
 /* ----- paste: always adopt page styling, never foreign HTML/CSS -------- */
@@ -180,6 +254,8 @@ const EditorSurface = memo(forwardRef(function EditorSurface({ bus }, ref) {
   const [sheets, setSheets] = useState({ tops: [0], h: 0, gap: 0 }); // A4 page sheets behind the content
   const [selBox, setSelBox] = useState(null); // overlay box over the targeted image
   const selIdx = useRef(null);
+  const replaceTarget = useRef(null);  // image awaiting a file from the picker
+  const quotaWarned = useRef(false);
   const setPage = (node) => {
     pageLocal.current = node;
     if (typeof ref === 'function') ref(node); else if (ref) ref.current = node;
@@ -291,38 +367,97 @@ const EditorSurface = memo(forwardRef(function EditorSurface({ bus }, ref) {
     const ro = new ResizeObserver(() => recompute());
     ro.observe(el); ro.observe(pageEl);
     requestAnimationFrame(() => relayout()); // re-run once App has wired report callbacks
-    const onInput = () => { set(LS.html, cleanedHTML()); bus.current.report(el); recompute(); };
+    const onInput = () => { saveDoc(); bus.current.report(el); recompute(); };
     el.addEventListener('input', onInput);
     // selecting an image by clicking it (native click selection is unreliable in contenteditable)
     const onClick = (e) => {
       const img = e.target && e.target.closest && e.target.closest('img');
       if (!img || !el.contains(img)) return;
       try { const r = document.createRange(); r.selectNode(img); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); } catch {}
+      // a link-only image can only be fixed by attaching the actual file
+      if (img.classList.contains('img-broken') && bus.current.openPicker) {
+        replaceTarget.current = img;
+        bus.current.openPicker();
+      }
     };
     el.addEventListener('click', onClick);
-    const insertImg = (url) => {
-      if (el.querySelectorAll('img').length >= 99) { if (bus.current.flash) bus.current.flash('Maximum 99 images'); return false; }
-      el.focus();
-      document.execCommand('insertHTML', false, `<img src="${url}" alt="" />`);
-      set(LS.html, cleanedHTML());
+    // persist, and say so when the document has outgrown the browser's quota
+    const saveDoc = () => {
+      if (set(LS.html, cleanedHTML())) { quotaWarned.current = false; return; }
+      if (!quotaWarned.current && bus.current.flash) {
+        quotaWarned.current = true;
+        bus.current.flash('Too large to autosave \u2014 print to PDF now');
+      }
+    };
+    // an image whose src this page cannot paint: show it as a placeholder the
+    // user can click, rather than a bare broken-image icon
+    const BROKEN_ALT = '\u26A0  Click here to attach this image file';
+    const markImage = (im) => {
+      const broken = !isInlineSrc(im.getAttribute('src')) || (im.complete && im.naturalWidth === 0);
+      im.classList.toggle('img-broken', broken);
+      if (broken) {
+        // the alt text is the only thing a broken <img> can render, so make it the instruction
+        if (!im.hasAttribute('data-alt')) im.setAttribute('data-alt', im.getAttribute('alt') || '');
+        im.setAttribute('alt', BROKEN_ALT);
+        im.title = 'This is a link to a file, not a picture \u2014 click to choose the image';
+      } else if (im.hasAttribute('data-alt')) {
+        im.setAttribute('alt', im.getAttribute('data-alt'));
+        im.removeAttribute('data-alt');
+        im.removeAttribute('title');
+      }
+      return broken;
+    };
+    /* Adopt every <img> in the document: inline what can be fetched, flag the
+       rest. Runs after any paste/drop/import that may carry image references. */
+    const adoptImages = async () => {
+      const imgs = [...el.querySelectorAll('img')].filter((im) => !isInlineSrc(im.getAttribute('src')));
+      if (!imgs.length) return;
+      let stuck = 0;
+      for (const im of imgs) {
+        const data = await inlineImageSrc(im.getAttribute('src'));
+        if (data) { im.setAttribute('src', data); im.classList.remove('img-broken'); im.removeAttribute('title'); }
+        else { markImage(im); stuck++; }
+      }
+      saveDoc();
       bus.current.report(el);
       relayout();
+      if (stuck && bus.current.flash)
+        bus.current.flash(stuck === 1
+          ? 'Pasted image is a link, not a picture \u2014 click it to attach the file'
+          : stuck + ' pasted images are links \u2014 click each to attach the file');
+    };
+    const insertImg = async (url) => {
+      const target = replaceTarget.current;
+      replaceTarget.current = null;
+      const src = await shrinkDataURL(String(url || ''));
+      if (target && el.contains(target)) {           // repairing an existing image
+        target.setAttribute('src', src);
+        markImage(target);
+        saveDoc();
+        bus.current.report(el);
+        relayout();
+        requestAnimationFrame(() => { relayout(); positionSel(); });
+        return true;
+      }
+      if (el.querySelectorAll('img').length >= 99) { if (bus.current.flash) bus.current.flash('Maximum 99 images'); return false; }
+      el.focus();
+      document.execCommand('insertHTML', false, `<img src="${src}" alt="" />`);
+      saveDoc();
+      bus.current.report(el);
+      relayout();
+      requestAnimationFrame(() => relayout());       // re-fit once the image height settles
       return true;
     };
     const onPaste = (e) => {
       const cd = e.clipboardData;
       if (!cd) return;
-      const items = cd.items || [];
-      for (const it of items) {
-        if (it.type && it.type.indexOf('image/') === 0) {
-          const file = it.getAsFile();
-          if (!file) continue;
-          e.preventDefault();
-          const fr = new FileReader();
-          fr.onload = () => insertImg(String(fr.result));
-          fr.readAsDataURL(file);
-          return;
-        }
+      const file = imageFileFrom(cd);
+      if (file) {                                    // real pixels on the clipboard
+        e.preventDefault();
+        fileToDataURL(file).then(insertImg).catch(() => {
+          if (bus.current.flash) bus.current.flash('Could not read that image');
+        });
+        return;
       }
       const plain = cd.getData('text/plain') || '';
       const html = cd.getData('text/html') || '';
@@ -332,11 +467,35 @@ const EditorSurface = memo(forwardRef(function EditorSurface({ bus }, ref) {
       el.focus();
       document.execCommand('insertHTML', false, insert);
       if (window.hljs) el.querySelectorAll('pre code').forEach((c) => { try { hljs.highlightElement(c); } catch {} });
-      set(LS.html, cleanedHTML());
+      saveDoc();
       bus.current.report(el);
       relayout();
+      adoptImages();                                 // image refs in the pasted markup
     };
     el.addEventListener('paste', onPaste);
+    // dropping an image file had no handler at all: the browser's default drops
+    // a file:// reference the page can never load
+    const onDragOver = (e) => { if (imageFileFrom(e.dataTransfer)) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; } };
+    const onDrop = (e) => {
+      const file = imageFileFrom(e.dataTransfer);
+      if (!file) return;
+      e.preventDefault();
+      const r = document.caretRangeFromPoint ? document.caretRangeFromPoint(e.clientX, e.clientY) : null;
+      if (r && el.contains(r.startContainer)) {
+        const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+      }
+      fileToDataURL(file).then(insertImg).catch(() => {
+        if (bus.current.flash) bus.current.flash('Could not read that image');
+      });
+    };
+    el.addEventListener('dragover', onDragOver);
+    el.addEventListener('drop', onDrop);
+    // an <img> can also fail late (a remote URL that 404s); catch it when it does
+    el.addEventListener('error', (e) => {
+      const im = e.target;
+      if (im && im.tagName === 'IMG' && el.contains(im)) markImage(im);
+    }, true);
+    adoptImages(); // flag/repair anything already in the restored document
     bus.current.focus = () => el.focus();
     bus.current.insertImage = insertImg;
     bus.current.imageCount = () => el.querySelectorAll('img').length;
@@ -348,7 +507,7 @@ const EditorSurface = memo(forwardRef(function EditorSurface({ bus }, ref) {
       const im = el.querySelectorAll('img')[i];
       if (!im) return;
       im.style.width = w;
-      set(LS.html, cleanedHTML());
+      saveDoc();
       bus.current.report(el);
       relayout();
       positionSel();
@@ -368,20 +527,29 @@ const EditorSurface = memo(forwardRef(function EditorSurface({ bus }, ref) {
       if (!im) return;
       im.style.marginLeft = a === 'left' ? '0' : 'auto';
       im.style.marginRight = a === 'right' ? '0' : 'auto';
-      set(LS.html, cleanedHTML());
+      saveDoc();
       relayout();
       positionSel();
     };
     bus.current.highlightImage = (i) => { selIdx.current = i; positionSel(); };
+    bus.current.cancelReplace = () => { replaceTarget.current = null; };
     bus.current.getDoc = () => cleanedHTML();
     bus.current.setDoc = (html) => {
       el.innerHTML = reflowHTML(html); // join soft-wrapped lines so prose justifies, on every path
       highlight();
-      set(LS.html, cleanedHTML());
+      saveDoc();
       bus.current.report(el);
       relayout();
+      adoptImages();
     };
-    return () => { el.removeEventListener('input', onInput); el.removeEventListener('paste', onPaste); el.removeEventListener('click', onClick); ro.disconnect(); };
+    return () => {
+      el.removeEventListener('input', onInput);
+      el.removeEventListener('paste', onPaste);
+      el.removeEventListener('click', onClick);
+      el.removeEventListener('dragover', onDragOver);
+      el.removeEventListener('drop', onDrop);
+      ro.disconnect();
+    };
   }, []);
   const stackH = sheets.h ? sheets.tops[sheets.tops.length - 1] + sheets.h : undefined;
   return (
@@ -1226,7 +1394,11 @@ function App() {
   };
 
   const exec = (t) => {
-    if (t.type === 'image') { imgRef.current && imgRef.current.click(); return; }
+    if (t.type === 'image') {
+      if (bus.current.cancelReplace) bus.current.cancelReplace(); // a fresh insert, not a repair
+      imgRef.current && imgRef.current.click();
+      return;
+    }
     bus.current.focus();
     if (t.type === 'cmd') document.execCommand(t.cmd, false, null);
     else if (t.type === 'block') document.execCommand('formatBlock', false, t.tag);
@@ -1240,11 +1412,13 @@ function App() {
   /* ---- image insert ---- */
   const onPickImage = (e) => {
     const file = e.target.files[0]; e.target.value = '';
-    if (!file) return;
-    const fr = new FileReader();
-    fr.onload = () => { setView('doc'); bus.current.insertImage(String(fr.result)); };
-    fr.readAsDataURL(file);
+    if (!file) { if (bus.current.cancelReplace) bus.current.cancelReplace(); return; } // dialog cancelled
+    fileToDataURL(file)
+      .then((url) => { setView('doc'); bus.current.insertImage(url); })
+      .catch(() => flash('Could not read that image'));
   };
+  // the editor asks for this when a link-only image is clicked
+  useEffect(() => { bus.current.openPicker = () => imgRef.current && imgRef.current.click(); });
 
   // keyboard: Alt+1..6 themes, Cmd/Ctrl+P print
   useEffect(() => {

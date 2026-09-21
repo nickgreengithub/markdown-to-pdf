@@ -12,7 +12,7 @@
    - a thumbnail under every line that references an image
    - paste / drop of image files handed to the app
    ============================================================ */
-const { useState: useStateMP, useEffect: useEffectMP, useRef: useRefMP } = React;
+const { useEffect: useEffectMP, useRef: useRefMP } = React;
 
 /* ---------- editor actions (pure functions of the view) ---------- */
 const MD = (() => {
@@ -396,12 +396,11 @@ function buildExtensions({ onDocChange, onCaret, onImageFiles }) {
 }
 
 /* ---------- the pane ---------- */
-function MarkdownPane({ initial, onDocChange, onCaret, onImageFiles, bus }) {
+function MarkdownPane({ initial, onDocChange, onCaret, onImageFiles, onActive, bus }) {
   const host = useRefMP(null);
   const viewRef = useRefMP(null);
   const cbs = useRefMP({});
-  const [active, setActive] = useStateMP({ line: null, inline: null, focused: false });
-  cbs.current = { onDocChange, onCaret, onImageFiles };
+  cbs.current = { onDocChange, onCaret, onImageFiles, onActive };
 
   useEffectMP(() => {
     const view = new CM.EditorView({
@@ -409,7 +408,11 @@ function MarkdownPane({ initial, onDocChange, onCaret, onImageFiles, bus }) {
         doc: initial,
         extensions: buildExtensions({
           onDocChange: (d) => cbs.current.onDocChange(d),
-          onCaret: (l, f, at) => { setActive({ ...at, focused: f }); cbs.current.onCaret(l, f); },
+          onCaret: (l, f, at) => {
+            const it = f ? SYNTAX.byId[at.inline || at.line] : null;
+            if (cbs.current.onActive) cbs.current.onActive(it ? it.label : '');
+            cbs.current.onCaret(l, f);
+          },
           onImageFiles: (files, v) => cbs.current.onImageFiles(files, v),
         }),
       }),
@@ -446,14 +449,8 @@ function MarkdownPane({ initial, onDocChange, onCaret, onImageFiles, bus }) {
     return () => { unsub(); view.destroy(); bus.current.md = null; };
   }, []);
 
-  const cur = active.focused ? SYNTAX.byId[active.inline || active.line] : null;
   return (
     <div className="mdpane">
-      <div className="pane-head">
-        <span className="pane-title">Markdown</span>
-        <span className="pane-note">{cur ? cur.label : ''}</span>
-        <span className="pane-hint">Type / for blocks</span>
-      </div>
       <div className="cm-host" ref={host} />
     </div>
   );

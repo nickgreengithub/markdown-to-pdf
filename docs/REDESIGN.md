@@ -45,9 +45,12 @@ zero build step for the app, and cache-only persistence.
   grid (fit several across, forced page breaks marked). Zoom with fit-width / fit-page.
 - **Linking.** Rendered blocks carry `data-line`. Caret movement highlights the block and
   keeps it in view; clicking a block moves the caret to its source. Scroll sync both ways.
-- **Styling.** Nothing permanent on screen. Click an element in the preview → popover with
-  that element's controls (the existing per-level / per-element control set). Theme and
-  Page setup live in the top bar. `LEVELS` / `levelKeys` / `expandTheme` are unchanged.
+- **Styling.** The left pane is tabbed: MARKDOWN and THEME. The THEME tab carries the theme
+  picker and every control on one scrollable page, grouped like the block menu; a click
+  on the page scrolls to that element's section. Per-image width and alignment sit in the
+  Images section and follow the caret's line. `LEVELS` / `levelKeys` / `expandTheme` are
+  unchanged. (An earlier form used a popover anchored to the clicked element; controls
+  inside the preview were judged the wrong place for them.)
 - **Print = preview.** The paginator is the print path: each sheet is a fixed-height A4
   box with `break-after: page`. Tables split at rows, lists at items, code at lines;
   paragraphs move whole.

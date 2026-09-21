@@ -1,7 +1,8 @@
-/* global React, FONTS, THEMES, levelKeys, RowIcon, CloseIcon, ResetIcon, FMT_ICONS */
+/* global React, FONTS, THEMES, levelKeys, RowIcon, ResetIcon, Dialect */
 /* ============================================================
-   Style popover — click an element in the preview, style it here.
-   Also exports the small controls the top-bar panels reuse.
+   Theme pane — the THEME tab of the left pane: the theme picker and
+   every style control, grouped the way the block menu is, all on one
+   scrollable page. Also home to the small controls it is built from.
    ============================================================ */
 const { useState: useStateSP, useEffect: useEffectSP, useRef: useRefSP, useLayoutEffect: useLayoutEffectSP } = React;
 
@@ -116,7 +117,6 @@ function rowsFor(target) {
       { label: 'Under-bar',   icon: 'bar',    type: 'toggle', v: k.bar, on: '1', off: '0' },
     ];
     if (target === 'p') rows.push({ label: 'Justify', icon: 'align', type: 'toggle', v: 'body-align', on: 'justify', off: 'left' });
-    else rows.push({ label: 'Colour', icon: 'color', type: 'color', v: 'ink', opts: 'ink' });
     return rows;
   }
   switch (target) {
@@ -163,9 +163,25 @@ function rowsFor(target) {
       { label: 'Colour', icon: 'color', type: 'color', v: 'rule', opts: 'rule' },
     ];
     case 'image': return [
+      { label: 'Rounded', icon: 'border', type: 'toggle', v: 'img-radius', on: '1', off: '0' },
+    ];
+    case 'thisimage': return [
       { label: 'Width', icon: 'width', type: 'imgwidth' },
       { label: 'Align', icon: 'align', type: 'imgalign' },
-      { label: 'Rounded', icon: 'border', type: 'toggle', v: 'img-radius', on: '1', off: '0' },
+    ];
+    case 'page': return [
+      { label: 'Margin top/bottom', icon: 'padY', type: 'step', v: 'pad-y', unit: 'mm', step: 1, min: 5, max: 45 },
+      { label: 'Margin sides', icon: 'padX', type: 'step', v: 'pad-x', unit: 'mm', step: 1, min: 5, max: 45 },
+      { label: 'Base size', icon: 'size', type: 'step', v: 'fs-base', unit: 'px', step: 0.5, min: 9, max: 24 },
+      { label: 'Line height', icon: 'lh', type: 'step', v: 'lh', step: 0.02, min: 1, max: 2.4 },
+      { label: 'Paragraph gap', icon: 'spaceB', type: 'step', v: 'para', unit: 'em', step: 0.05, min: 0, max: 2.5 },
+    ];
+    case 'colours': return [
+      { label: 'Text', icon: 'color', type: 'color', v: 'ink', opts: 'ink' },
+      { label: 'Accent', icon: 'color', type: 'color', v: 'accent', opts: 'accent' },
+      { label: 'Muted', icon: 'color', type: 'color', v: 'muted', opts: 'muted' },
+      { label: 'Rules & borders', icon: 'border', type: 'color', v: 'rule', opts: 'rule' },
+      { label: 'Code background', icon: 'fill', type: 'color', v: 'code-bg', opts: 'codebg' },
     ];
     default: return [];
   }
@@ -226,64 +242,86 @@ function Inspector({ target, vars, setVar, img }) {
   );
 }
 
-/* the popover itself: anchored beside the clicked element, clamped to the viewport */
-function StylePopover({ target, anchorRect, bounds, vars, setVar, onReset, img, line, onClose, onSwitch, onGoto }) {
-  const ref = useRefSP(null);
-  const [pos, setPos] = useStateSP({ left: -9999, top: -9999 });
-  useLayoutEffectSP(() => {
-    const el = ref.current; if (!el || !anchorRect) return;
-    const W = el.offsetWidth, H = el.offsetHeight, m = 12;
-    const b = bounds || { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
-    let left = anchorRect.right + m;
-    if (left + W > b.right - m) left = anchorRect.left - W - m;
-    if (left < b.left + m) left = Math.min(Math.max(b.left + m, anchorRect.left), b.right - W - m);
-    let top = anchorRect.top;
-    if (top + H > b.bottom - m) top = Math.max(b.top + m, b.bottom - H - m);
-    if (top < b.top + m) top = b.top + m;
-    setPos({ left, top });
-  }, [anchorRect, target, bounds]);
-  useEffectSP(() => {
-    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
-    const onDown = (e) => { if (ref.current && !ref.current.contains(e.target) && !e.target.closest('.preview-scroll')) onClose(); };
-    document.addEventListener('keydown', onKey); document.addEventListener('mousedown', onDown);
-    return () => { document.removeEventListener('keydown', onKey); document.removeEventListener('mousedown', onDown); };
-  }, [onClose]);
+/* ---- the pane ---- */
+const SECTIONS = [
+  { group: 'Page', items: [{ id: 'page', label: 'Page', glyph: '▭' }] },
+  { group: 'Text', items: [
+    { id: 'h1', label: 'Heading 1', glyph: 'H1' }, { id: 'h2', label: 'Heading 2', glyph: 'H2' },
+    { id: 'h3', label: 'Heading 3', glyph: 'H3' }, { id: 'h4', label: 'Heading 4', glyph: 'H4' },
+    { id: 'p', label: 'Body text', glyph: 'Aa' },
+  ] },
+  { group: 'Blocks', items: [
+    { id: 'list', label: 'Lists', glyph: '•' }, { id: 'quote', label: 'Quote', glyph: '❝' },
+    { id: 'code', label: 'Code', glyph: '{ }' }, { id: 'table', label: 'Table', glyph: '▦' }, { id: 'rule', label: 'Rule', glyph: '—' },
+  ] },
+  { group: 'Media', items: [{ id: 'image', label: 'Images', glyph: '🖼' }, { id: 'caption', label: 'Captions', glyph: '“' }] },
+  { group: 'Inline', items: [{ id: 'link', label: 'Links', glyph: '🔗' }, { id: 'footnotes', label: 'Footnotes', glyph: '¹' }] },
+  { group: 'Colours', items: [{ id: 'colours', label: 'Colours', glyph: '◐' }] },
+];
+const SECTION_OF = { 'inline-code': 'code', pagebreak: 'page', vspace: 'page' };
 
-  const info = target === 'pagebreak' ? 'Forces a new page here. Edit or delete the \\pagebreak line in the markdown.'
-    : target === 'vspace' ? 'Vertical space from a \\ line in the markdown. Repeat the line for more, or use \\vspace N.'
-    : null;
+function ThemePane({ themeId, applyTheme, vars, setVar, onReset, focus, caretImage, pageNumbers, setPageNumbers }) {
+  const scroll = useRefSP(null);
+  const [flashId, setFlashId] = useStateSP(null);
+  const cur = THEMES.find((t) => t.id === themeId) || THEMES[0];
+  // a click on the page brings its section into view
+  useEffectSP(() => {
+    if (!focus) return;
+    const id = SECTION_OF[focus.kind] || focus.kind;
+    const el = scroll.current && scroll.current.querySelector('#th-' + id);
+    if (!el) return;
+    el.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    setFlashId(id);
+    const t = setTimeout(() => setFlashId(null), 1400);
+    return () => clearTimeout(t);
+  }, [focus]);
+  const allKeys = SECTIONS.flatMap((g) => g.items.flatMap((it) => keysOf(it.id)));
   return (
-    <div className="stylepop" ref={ref} style={{ left: pos.left, top: pos.top }} onMouseDown={(e) => e.stopPropagation()}>
-      <div className="stylepop-head">
-        <HoverMenu className="tsel-target" button={<span className="sp-target">{TARGET_LABEL[target] || target}{img && img.name ? <span className="sp-sub">{img.name}</span> : null}</span>}>
-          {(close) => TARGET_GROUPS.map((g) => (
-            <div className="tsel-group" key={g.label}>
-              <div className="tsel-glabel">{g.label}</div>
-              {g.items.map((id) => {
-                const lvl = /^(h[1-4]|p)$/.test(id);
-                const k = lvl ? levelKeys(id) : null;
-                return (
-                  <button key={id} className={'tsel-item' + (id === target ? ' sel' : '')} onClick={() => { onSwitch(id); close(); }}>
-                    {lvl ? <span className="tsel-prev" style={{ fontFamily: vars[k.font], fontWeight: vars[k.weight] }}>Ag</span> : <span className="tsel-ic">{TARGET_LABEL[id].slice(0, 1)}</span>}
-                    <span className="tsel-name">{TARGET_LABEL[id]}</span>
-                  </button>
-                );
-              })}
+    <div className="themepane" ref={scroll}>
+      <div className="th-top">
+        <HoverMenu className="tsel-theme" button={<span><span className="tsel-aa" style={{ background: cur.vars.paper, color: cur.vars.ink, fontFamily: cur.vars['font-head'] }}>Aa</span><span className="th-name">{cur.name}</span><span className="th-note">{cur.note}</span></span>}>
+          {(close) => (
+            <div className="tsel-group">
+              {THEMES.map((t) => (
+                <button key={t.id} className={'tsel-item' + (t.id === themeId ? ' sel' : '')} onClick={() => { applyTheme(t); close(); }}>
+                  <span className="tsel-aa" style={{ background: t.vars.paper, color: t.vars.ink, fontFamily: t.vars['font-head'] }}>Aa</span>
+                  <span className="tsel-name">{t.name}<span className="tsel-note-inl">{t.note}</span></span>
+                  {t.id === themeId && <span className="tsel-cur">current</span>}
+                </button>
+              ))}
+              <div className="tsel-note">Applying a theme resets every control below to that theme.</div>
             </div>
-          ))}
+          )}
         </HoverMenu>
-        <div className="stylepop-actions">
-          {line != null && <button className="fmt small" title="Go to this line in the markdown" onClick={() => onGoto(line)}>line {line + 1}</button>}
-          {keysOf(target).length > 0 && <button className="fmt ico" title="Reset these to the theme" onClick={() => onReset(keysOf(target))}><ResetIcon /></button>}
-          <button className="fmt ico" title="Close (Esc)" onClick={onClose}><CloseIcon /></button>
-        </div>
+        <button className="fmt small" title="Put every control back to the theme's values" onClick={() => onReset(allKeys)}><ResetIcon /> Reset all</button>
       </div>
-      {info ? <div className="stylepop-info">{info}</div> : <Inspector target={target} vars={vars} setVar={setVar} img={img} />}
-      {target === 'image' && img && !img.name && <div className="stylepop-info">Select the image itself to size it.</div>}
-      {target === 'image' && img && img.missing && (
-        <div className="stylepop-info"><b>{img.name}</b> is not in this browser's image store, so nothing can be shown. Paste or drop the image onto the editor to add it.</div>
-      )}
-      {(target === 'image') && img && img.name && <div className="stylepop-foot">Width and alignment are written into the markdown after the image.</div>}
+      {SECTIONS.map((g) => (
+        <div className="th-group" key={g.group}>
+          <div className="th-glabel">{g.group}</div>
+          {g.items.map((it) => (
+            <section className={'th-section' + (flashId === it.id ? ' flash' : '')} id={'th-' + it.id} key={it.id}>
+              <div className="th-head">
+                <span className="th-ic">{it.glyph}</span>
+                <span className="th-label">{it.label}</span>
+                {keysOf(it.id).length > 0 && <button className="fmt ico th-reset" title="Reset this section to the theme" onClick={() => onReset(keysOf(it.id))}><ResetIcon /></button>}
+              </div>
+              <Inspector target={it.id} vars={vars} setVar={setVar} />
+              {it.id === 'page' && (
+                <div className="insp">
+                  <div className="irow"><span className="ir-label"><RowIcon name="marker" /><span className="ir-lt">Page numbers</span></span><div className="ir-ctl"><Toggle on={pageNumbers !== 'none'} onChange={(o) => setPageNumbers(o ? 'bottom' : 'none')} /></div></div>
+                </div>
+              )}
+              {it.id === 'image' && (
+                <div className="th-sub">
+                  <div className="th-sublabel">{caretImage ? <>This image <code>{caretImage.name}</code></> : 'Put the caret on a line with an image to size it'}</div>
+                  <Inspector target="thisimage" vars={vars} setVar={setVar} img={caretImage} />
+                  {caretImage && <div className="th-foot">Written into the markdown after the image as <code>{'{width=… align=…}'}</code>.</div>}
+                </div>
+              )}
+            </section>
+          ))}
+        </div>
+      ))}
     </div>
   );
 }

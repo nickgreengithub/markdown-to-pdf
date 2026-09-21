@@ -1,4 +1,4 @@
-/* global React, ReactDOM, THEMES, expandTheme, Dialect, Library, DEMO, MarkdownPane, PreviewPane, StylePopover, HoverMenu, RowStep, Toggle, RowIcon, LogoMark, PrintIcon, SingleIcon, SpreadIcon, GridIcon, TurndownService, turndownPluginGfm */
+/* global React, ReactDOM, THEMES, expandTheme, Dialect, Library, DEMO, MarkdownPane, PreviewPane, ThemePane, HoverMenu, LogoMark, PrintIcon, SingleIcon, SpreadIcon, GridIcon, TurndownService, turndownPluginGfm */
 /* ============================================================
    App — top bar, the two panes, persistence, print.
    Markdown text is the only source of truth; everything else derives.
@@ -51,14 +51,15 @@ function App() {
     const base = expandTheme(getTheme(get(LS.theme, get('mdv2.theme', t0.id))).vars);
     return persisted ? { ...base, ...persisted, paper: '#ffffff' } : base;
   });
-  const [ui, setUi] = useState(() => ({ mode: 'single', zoom: null, split: 0.42, pageNumbers: 'none', narrow: 'md', dark: true, ...getJSON(LS.ui, {}) }));
+  const [ui, setUi] = useState(() => ({ mode: 'single', zoom: null, split: 0.42, pageNumbers: 'none', narrow: 'md', dark: false, tab: 'md', ...getJSON(LS.ui, {}) }));
   useEffect(() => { document.documentElement.dataset.ui = ui.dark ? 'dark' : 'light'; }, [ui.dark]);
   const [toast, setToast] = useState('');
   const [stats, setStats] = useState({ pages: 1, words: 0 });
   const [fitZoom, setFitZoom] = useState(1);
   const [currentLine, setCurrentLine] = useState(null);
   const [editorFocused, setEditorFocused] = useState(false);
-  const [popover, setPopover] = useState(null);
+  const [pageFocus, setPageFocus] = useState(null);   // { line, kind } of the block last clicked on the page
+  const [construct, setConstruct] = useState('');     // what is under the caret, for the pane header
   const bus = useRef({});
   const splitRef = useRef(null);
 
@@ -118,17 +119,17 @@ function App() {
     return () => { window.removeEventListener('paste', onPaste); window.removeEventListener('drop', onDrop); window.removeEventListener('dragover', onOver); };
   }, [addImages]);
 
-  /* ---- preview interactions ---- */
+  /* ---- preview interactions: a click jumps the caret to the source and,
+     when the Theme tab is showing, brings that element's section into view ---- */
   const onBlockClick = (info) => {
-    if (!info) { setPopover(null); return; }
+    if (!info) { setPageFocus(null); return; }
     if (bus.current.md) bus.current.md.gotoLine(info.line, { y: 'center' });
     setCurrentLine(info.line);
-    const r = info.anchor.getBoundingClientRect();
-    setPopover({ target: info.kind, line: info.line, lineEnd: info.lineEnd, imgName: info.imgName, anchorRect: { left: r.left, top: r.top, right: r.right, bottom: r.bottom } });
+    setPageFocus({ line: info.line, kind: info.kind, at: Date.now() });
   };
-  const onCaret = useCallback((line, focused) => { setCurrentLine(line); setEditorFocused(focused); }, []);
-  // the outline on the page exists only while the editor has focus or a popover is open
-  const highlightLine = popover ? popover.line : (editorFocused ? currentLine : null);
+  const onCaret = useCallback((line, focused) => { setCurrentLine(line); setEditorFocused(focused); if (focused) setPageFocus(null); }, []);
+  // the outline on the page exists while the editor has focus, or after a click on the page
+  const highlightLine = editorFocused ? currentLine : (pageFocus ? pageFocus.line : null);
   const onScrollLine = useCallback((line) => { if (bus.current.md && !bus.current.md.view.hasFocus) bus.current.md.scrollToLine(line); }, []);
   const onPages = useCallback((n, text) => {
     const words = (text.trim().match(/\S+/g) || []).length;
@@ -136,19 +137,20 @@ function App() {
   }, []);
   const onFitZoom = useCallback((z) => setFitZoom(z), []);
 
-  // image attributes live in the markdown; the popover edits them there
-  const imgCtx = useMemo(() => {
-    if (!popover || popover.target !== 'image' || !popover.imgName || !bus.current.md) return null;
+  // image attributes live in the markdown; the Theme tab edits them on the caret's line
+  const caretImage = useMemo(() => {
     const m = bus.current.md;
-    let ln = popover.line, text = null;
-    for (let n = popover.line; n < (popover.lineEnd || popover.line + 1); n++) { const t = m.getLine(n); if (t && Dialect.getImageAttrs(t, popover.imgName)) { ln = n; text = t; break; } }
-    const missing = !Library.has(popover.imgName) && !/^(https?:|data:|blob:)/.test(popover.imgName);
-    if (text == null) return { name: popover.imgName, attrs: {}, set: () => {}, missing };
+    if (currentLine == null || !m) return null;
+    const text = m.getLine(currentLine);
+    if (!text) return null;
+    const ref = /!\[[^\]]*\]\(\s*([^)\s"]+)/.exec(text);
+    if (!ref) return null;
+    const name = ref[1];
     return {
-      name: popover.imgName, attrs: Dialect.getImageAttrs(text, popover.imgName) || {}, missing,
-      set: (patch) => { const cur = m.getLine(ln); const next = Dialect.setImageAttrs(cur, popover.imgName, patch); if (next != null && next !== cur) m.setLine(ln, next); },
+      name, attrs: Dialect.getImageAttrs(text, name) || {},
+      set: (patch) => { const cur = m.getLine(currentLine); const next = Dialect.setImageAttrs(cur, name, patch); if (next != null && next !== cur) m.setLine(currentLine, next); },
     };
-  }, [popover, md]);
+  }, [currentLine, md]);
 
   /* ---- print: the preview's sheets, verbatim ---- */
   const doPrint = () => {
@@ -225,32 +227,6 @@ function App() {
             )}
           </HoverMenu>
         </div>
-        <div className="tb-center">
-          <HoverMenu className="tsel-menu" button={<span><span className="tb-k">Theme</span> {getTheme(themeId).name}</span>}>
-            {(close) => (
-              <div className="tsel-group">
-                {THEMES.map((t, i) => (
-                  <button key={t.id} className={'tsel-item' + (t.id === themeId ? ' sel' : '')} onClick={() => { applyTheme(t); close(); }}>
-                    <span className="tsel-aa" style={{ background: t.vars.paper, color: t.vars.ink, fontFamily: t.vars['font-head'] }}>Aa</span>
-                    <span className="tsel-name">{t.name}<span className="tsel-note-inl">{t.note}</span></span>
-                    <span className="tsel-cur">{t.id === themeId ? 'current' : (isMac ? '⌥' : 'Alt+') + (i + 1)}</span>
-                  </button>
-                ))}
-                <div className="tsel-note">Applying a theme resets every style to that theme.</div>
-              </div>
-            )}
-          </HoverMenu>
-          <HoverMenu className="tsel-menu tsel-page" button={<span><span className="tb-k">Page</span> A4 · {parseFloat(vars['pad-y'])}/{parseFloat(vars['pad-x'])} mm</span>}>
-            <div className="insp pagesetup">
-              <div className="irow"><span className="ir-label"><RowIcon name="padY" /><span className="ir-lt">Margin top/bottom</span></span><div className="ir-ctl"><RowStep value={vars['pad-y']} unit="mm" step={1} min={5} max={45} onChange={(v) => setVar('pad-y', v)} /></div></div>
-              <div className="irow"><span className="ir-label"><RowIcon name="padX" /><span className="ir-lt">Margin sides</span></span><div className="ir-ctl"><RowStep value={vars['pad-x']} unit="mm" step={1} min={5} max={45} onChange={(v) => setVar('pad-x', v)} /></div></div>
-              <div className="irow"><span className="ir-label"><RowIcon name="size" /><span className="ir-lt">Base size</span></span><div className="ir-ctl"><RowStep value={vars['fs-base']} unit="px" step={0.5} min={9} max={24} onChange={(v) => setVar('fs-base', v)} /></div></div>
-              <div className="irow"><span className="ir-label"><RowIcon name="lh" /><span className="ir-lt">Line height</span></span><div className="ir-ctl"><RowStep value={vars['lh']} step={0.02} min={1} max={2.4} onChange={(v) => setVar('lh', v)} /></div></div>
-              <div className="irow"><span className="ir-label"><RowIcon name="spaceB" /><span className="ir-lt">Paragraph gap</span></span><div className="ir-ctl"><RowStep value={vars['para']} unit="em" step={0.05} min={0} max={2.5} onChange={(v) => setVar('para', v)} /></div></div>
-              <div className="irow"><span className="ir-label"><RowIcon name="marker" /><span className="ir-lt">Page numbers</span></span><div className="ir-ctl"><Toggle on={ui.pageNumbers !== 'none'} onChange={(o) => setU({ pageNumbers: o ? 'bottom' : 'none' })} /></div></div>
-            </div>
-          </HoverMenu>
-        </div>
         <div className="tb-right">
           <div className="seg modes">
             {[['single', SingleIcon, 'Single page'], ['spread', SpreadIcon, 'Two-up'], ['grid', GridIcon, 'Grid — plan page breaks']].map(([m, I, t]) => (
@@ -273,14 +249,27 @@ function App() {
 
       <div className="split" ref={splitRef}>
         <div className="pane pane-md" style={{ width: (ui.split * 100) + '%' }}>
-          <MarkdownPane initial={initialMd} bus={bus} onDocChange={setMd} onCaret={onCaret} onImageFiles={(files) => addImages(files)} />
+          <div className="pane-head">
+            <button className={'pane-tab' + (ui.tab === 'md' ? ' on' : '')} onClick={() => setU({ tab: 'md' })}>Markdown</button>
+            <button className={'pane-tab' + (ui.tab === 'theme' ? ' on' : '')} onClick={() => setU({ tab: 'theme' })}>Theme<span className="pane-tab-sub">{getTheme(themeId).name}</span></button>
+            {ui.tab === 'md'
+              ? <><span className="pane-note">{construct}</span><span className="pane-hint">Type / for blocks</span></>
+              : <span className="pane-hint">Click anything on the page to find its controls</span>}
+          </div>
+          <div className="pane-body" style={{ display: ui.tab === 'md' ? undefined : 'none' }}>
+            <MarkdownPane initial={initialMd} bus={bus} onDocChange={setMd} onCaret={onCaret} onImageFiles={(files) => addImages(files)} onActive={setConstruct} />
+          </div>
+          {ui.tab === 'theme' && (
+            <ThemePane themeId={themeId} applyTheme={applyTheme} vars={vars} setVar={setVar} onReset={resetKeys}
+              focus={pageFocus} caretImage={caretImage} pageNumbers={ui.pageNumbers} setPageNumbers={(v) => setU({ pageNumbers: v })} />
+          )}
         </div>
         <div className="divider" onMouseDown={onDividerDown} title="Drag to resize" />
         <div className="pane pane-pv">
           <div className="pane-head pane-head-pv">
             <span className="pane-title">Preview</span>
             <span className="pane-note">A4 · {stats.pages} {stats.pages === 1 ? 'page' : 'pages'} · {stats.words} words</span>
-            <span className="pane-hint">Click anything on the page to style it</span>
+            <span className="pane-hint">Click anything on the page to go to its source</span>
           </div>
           <PreviewPane html={html} vars={pageVars} mode={ui.mode} zoom={ui.zoom} pageNumbers={ui.pageNumbers}
             currentLine={highlightLine} caretDriven={editorFocused} onBlockClick={onBlockClick} onScrollLine={onScrollLine}
@@ -288,12 +277,6 @@ function App() {
         </div>
       </div>
 
-      {popover && (
-        <StylePopover target={popover.target} anchorRect={popover.anchorRect} bounds={bus.current.pv && bus.current.pv.root() ? bus.current.pv.root().getBoundingClientRect() : null}
-          vars={vars} setVar={setVar} onReset={resetKeys} img={imgCtx} line={popover.line}
-          onClose={() => setPopover(null)} onSwitch={(t) => setPopover((p) => ({ ...p, target: t }))}
-          onGoto={(l) => bus.current.md && bus.current.md.gotoLine(l, { focus: true })} />
-      )}
       <div className={'toast' + (toast ? ' show' : '')}>{toast}</div>
     </div>
   );

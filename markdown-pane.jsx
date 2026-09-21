@@ -8,7 +8,6 @@
      sectioned, scrollable, filtered as you type, Suggested on top
    - a "+" handle on the active line opens the same menu for that line
    - "\" completes the layout directives
-   - hover help on any construct, with "change to…" for line-level ones
    - a thumbnail under every line that references an image
    - paste / drop of image files handed to the app
    ============================================================ */
@@ -127,39 +126,6 @@ const MD = (() => {
   return { apply, setLinePrefix, wrap, insertBlock, insertAtCaret };
 })();
 
-/* ---------- help content (tooltip + gutter popover share it) ---------- */
-function helpDOM(view, itemId, lineNo) {
-  const it = SYNTAX.byId[itemId];
-  if (!it) return null;
-  const box = document.createElement('div');
-  box.className = 'cm-help';
-  const h = document.createElement('div'); h.className = 'cm-help-title';
-  h.innerHTML = `<span class="cm-help-glyph">${it.glyph}</span>${it.label}`;
-  box.appendChild(h);
-  const s = document.createElement('code'); s.className = 'cm-help-syntax'; s.textContent = it.syntax; box.appendChild(s);
-  const d = document.createElement('div'); d.className = 'cm-help-desc';
-  d.innerHTML = it.desc.replace(/`([^`]+)`/g, '<code>$1</code>');
-  box.appendChild(d);
-  if (lineNo != null && (SYNTAX.SWITCHABLE.includes(itemId))) {
-    const row = document.createElement('div'); row.className = 'cm-help-switch';
-    const lab = document.createElement('span'); lab.textContent = 'Change to'; row.appendChild(lab);
-    SYNTAX.SWITCHABLE.filter((id) => id !== itemId).forEach((id) => {
-      const b = document.createElement('button');
-      const o = SYNTAX.byId[id];
-      b.textContent = o.glyph; b.title = o.label;
-      b.onmousedown = (e) => {
-        e.preventDefault();
-        const line = view.state.doc.line(lineNo + 1);
-        view.dispatch({ selection: { anchor: line.from } });
-        MD.setLinePrefix(view, o);
-      };
-      row.appendChild(b);
-    });
-    box.appendChild(row);
-  }
-  return box;
-}
-
 /* which construct is at a position: line-level first, then the syntax tree */
 const INLINE_NODE = { StrongEmphasis: 'bold', Emphasis: 'italic', Strikethrough: 'strike', InlineCode: 'code', Link: 'link', Image: 'image', URL: 'link', FencedCode: 'fence', CodeBlock: 'fence', Table: 'table', HorizontalRule: 'hr', Blockquote: 'quote' };
 function constructAt(view, pos) {
@@ -192,7 +158,7 @@ const MENU = [
 const libTick = CM.StateEffect.define();
 
 function buildExtensions({ onDocChange, onCaret, onImageFiles }) {
-  const { EditorView, keymap, drawSelection, highlightActiveLine, highlightActiveLineGutter, Decoration, ViewPlugin, WidgetType, hoverTooltip, placeholder, gutter, GutterMarker,
+  const { EditorView, keymap, drawSelection, highlightActiveLine, highlightActiveLineGutter, Decoration, ViewPlugin, WidgetType, placeholder, gutter, GutterMarker,
     defaultKeymap, history, historyKeymap, indentWithTab, markdown, markdownLanguage, syntaxHighlighting, HighlightStyle, autocompletion, completionKeymap, startCompletion,
     searchKeymap, highlightSelectionMatches, tags: t, Prec } = CM;
 
@@ -228,13 +194,6 @@ function buildExtensions({ onDocChange, onCaret, onImageFiles }) {
     inFenceCache = { doc: state.doc, lines: set };
     return set;
   };
-
-  /* hover help */
-  const hover = hoverTooltip((view, pos) => {
-    const c = constructAt(view, pos);
-    if (!c) return null;
-    return { pos: c.from, end: c.to, above: true, create: () => ({ dom: helpDOM(view, c.id, c.line) || document.createElement('div') }) };
-  }, { hoverTime: 350 });
 
   /* line backgrounds: directives, code, and the hint on an empty active line */
   const lineDeco = ViewPlugin.fromClass(class {
@@ -312,21 +271,42 @@ function buildExtensions({ onDocChange, onCaret, onImageFiles }) {
 
   /* thumbnails under lines that reference images */
   const REF_RE = /!\[[^\]]*\]\(\s*([^)\s"]+)/g;
+  // a whole image reference: ![alt](name "title"){attrs}
+  const FULL_REF_RE = /!\[[^\]]*\]\([^)]*\)(\{[^}]*\})?/g;
   class Thumbs extends WidgetType {
-    constructor(names) { super(); this.names = names; }
+    constructor(names, lineFrom) { super(); this.names = names; this.lineFrom = lineFrom; }
     eq(o) { return o.names.join('|') === this.names.join('|') && o.urls === this.urls; }
     get urls() { return this.names.map((n) => Library.urlFor(n) || (/^(https?:|data:|blob:)/.test(n) ? n : '')).join('|'); }
     toDOM() {
       const box = document.createElement('div'); box.className = 'cm-thumbs';
       this.names.forEach((n) => {
         const url = Library.urlFor(n) || (/^(https?:|data:|blob:)/.test(n) ? n : null);
-        if (url) { const im = document.createElement('img'); im.src = url; im.alt = n; im.title = n; im.draggable = false; box.appendChild(im); }
+        if (url) { const im = document.createElement('img'); im.src = url; im.alt = n; im.title = 'Click to select this image; Delete removes it'; im.draggable = false; im.dataset.name = n; box.appendChild(im); }
         else { const c = document.createElement('span'); c.className = 'cm-thumb-missing'; c.textContent = n + ' — not in this browser; paste the image again'; box.appendChild(c); }
       });
       return box;
     }
-    ignoreEvent() { return true; }
+    ignoreEvent(e) { return e.type !== 'mousedown'; }
   }
+  /* clicking a thumbnail selects its reference in the text */
+  const selectRef = EditorView.domEventHandlers({
+    mousedown(e, view) {
+      const im = e.target.closest && e.target.closest('.cm-thumbs img');
+      if (!im) return false;
+      e.preventDefault();
+      const box = im.closest('.cm-thumbs');
+      const pos = view.posAtDOM(box);
+      const line = view.state.doc.lineAt(Math.max(0, pos - 1));
+      const name = im.dataset.name;
+      let m, range = null;
+      FULL_REF_RE.lastIndex = 0;
+      while ((m = FULL_REF_RE.exec(line.text))) { if (m[0].includes('(' + name) || m[0].includes(' ' + name) || m[0].includes(name)) { range = { from: line.from + m.index, to: line.from + m.index + m[0].length }; break; } }
+      if (!range) range = { from: line.from, to: line.to };
+      view.dispatch({ selection: { anchor: range.from, head: range.to }, scrollIntoView: true });
+      view.focus();
+      return true;
+    },
+  });
   const thumbDecos = (state) => {
     const b = new CM.RangeSetBuilder();
     const fences = fenceLines(state);
@@ -334,7 +314,7 @@ function buildExtensions({ onDocChange, onCaret, onImageFiles }) {
       const line = state.doc.line(i);
       if (fences.has(i) || line.text.indexOf('![') < 0) continue;
       const names = [...line.text.matchAll(REF_RE)].map((m) => m[1]);
-      if (names.length) b.add(line.to, line.to, Decoration.widget({ widget: new Thumbs(names), block: true, side: 1 }));
+      if (names.length) b.add(line.to, line.to, Decoration.widget({ widget: new Thumbs(names, line.from), block: true, side: 1 }));
     }
     return b.finish();
   };
@@ -374,10 +354,10 @@ function buildExtensions({ onDocChange, onCaret, onImageFiles }) {
     syntaxHighlighting(style),
     EditorView.lineWrapping,
     placeholder('Start writing, or type / for blocks. Paste an image anywhere.'),
-    lineDeco, thumbs, hover,
+    lineDeco, thumbs,
     autocompletion({ override: [blockSource], activateOnTyping: true, icons: true, maxRenderedOptions: 40, defaultKeymap: true, closeOnBlur: true }),
     highlightSelectionMatches(),
-    events,
+    events, selectRef,
     Prec.high(keymap.of(shortcuts)),
     keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap, ...completionKeymap, indentWithTab]),
     EditorView.updateListener.of((u) => {

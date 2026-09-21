@@ -111,7 +111,7 @@ function App() {
       try { names.push(await Library.add(f)); } catch { flash('Could not read that image'); }
     }
     if (names.length && bus.current.md) {
-      bus.current.md.insert(names.map((n) => `![](${n}){width=50% align=left}`).join('\n\n'), true);
+      bus.current.md.insert(names.map((n) => `![](${n} "caption text here"){width=50% align=left}`).join('\n\n'), true);
       flash(names.length === 1 ? `Added ${names[0]} to the library` : `Added ${names.length} images`);
     }
   }, [flash]);

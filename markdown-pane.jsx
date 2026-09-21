@@ -226,12 +226,24 @@ function buildExtensions({ onDocChange, onCaret, onImageFiles }) {
     section: { name: section, rank },
     apply: (view, c, f, to) => {
       anchor = null;
-      view.dispatch({ changes: { from: slashAt != null ? slashAt : f, to, insert: '' } });
+      const block = pendingBlock; pendingBlock = null;
+      const cut = { from: slashAt != null ? slashAt : f, to };
+      view.dispatch({ changes: { ...cut, insert: '' } });
+      if (block && it.kind === 'prefix' && block.to > block.from) {
+        // the whole block, e.g. every item of a list
+        const end = block.to - (cut.to - cut.from);
+        view.dispatch({ selection: { anchor: block.from, head: Math.max(block.from, end) } });
+        MD.setLinePrefix(view, it);
+        view.dispatch({ selection: { anchor: view.state.doc.lineAt(block.from).to } });
+        return;
+      }
       MD.apply(view, it);
     },
   }));
-  // where a handle-opened menu started, so the typed filter is known without a "/"
+  // where a handle-opened menu started, so the typed filter is known without a "/",
+  // and the block it was opened for, so a line-level pick applies to all of it
   let anchor = null;
+  let pendingBlock = null;
   const blockSource = (ctx) => {
     const line = ctx.state.doc.lineAt(ctx.pos);
     const before = line.text.slice(0, ctx.pos - line.from);
@@ -247,22 +259,38 @@ function buildExtensions({ onDocChange, onCaret, onImageFiles }) {
     return { from, options: menuOptions(items, slashAt), filter: true, validFor: /^[\w\- ]*$/ };
   };
 
-  /* the "+" handle: visible on the active or hovered line, opens the menu for it */
+  /* the "+" handle: one per block (a list, a table, a code fence, a quote or a
+     paragraph is one block), on its first line; blank lines get one too, since
+     that is where a block would be added. Opens the menu for the block. */
+  const blockAt = (state, pos) => {
+    // the top-level syntax node covering pos, if any
+    let node = CM.syntaxTree(state).resolveInner(pos, 1);
+    while (node && node.parent && node.parent.parent) node = node.parent;
+    return node && node.parent ? node : null;
+  };
+  const blockRange = (state, line) => {
+    const node = blockAt(state, line.from);
+    if (!node || node.from > line.to) return { from: line.from, to: line.to, first: true };
+    const start = state.doc.lineAt(node.from);
+    return { from: start.from, to: state.doc.lineAt(Math.max(node.from, node.to - 1)).to, first: start.number === line.number };
+  };
   class Handle extends GutterMarker {
-    toDOM() { const s = document.createElement('span'); s.className = 'cm-handle'; s.textContent = '+'; s.title = 'Change this line, or insert a block'; return s; }
+    toDOM() { const s = document.createElement('span'); s.className = 'cm-handle'; s.textContent = '+'; s.title = 'Change this block, or insert one'; return s; }
   }
   const handle = new Handle();
   const handleGutter = gutter({
     class: 'cm-handle-gutter',
-    lineMarker: () => handle,
-    lineMarkerChange: () => false,
+    lineMarker: (view, line) => (blockRange(view.state, view.state.doc.lineAt(line.from)).first ? handle : null),
+    lineMarkerChange: (u) => u.docChanged,
     initialSpacer: () => handle,
     domEventHandlers: {
       mousedown(view, line, e) {
         e.preventDefault();
         const l = view.state.doc.lineAt(line.from);
-        view.dispatch({ selection: { anchor: l.from } });
+        const r = blockRange(view.state, l);
+        view.dispatch({ selection: { anchor: r.from } });
         view.focus();
+        pendingBlock = { from: r.from, to: r.to };
         startCompletion(view);
         return true;
       },
@@ -364,7 +392,7 @@ function buildExtensions({ onDocChange, onCaret, onImageFiles }) {
       if (u.docChanged) onDocChange(u.state.doc.toString());
       if (u.docChanged || u.selectionSet || u.focusChanged) {
         const head = u.state.selection.main.head;
-        if (anchor && u.state.doc.lineAt(head).number !== anchor.line) anchor = null;
+        if (anchor && u.state.doc.lineAt(head).number !== anchor.line) { anchor = null; pendingBlock = null; }
         const c = constructAt(u.view, head);
         onCaret(u.state.doc.lineAt(head).number - 1, u.view.hasFocus, {
           line: SYNTAX.detectLine(u.state.doc.lineAt(head).text) || 'p',

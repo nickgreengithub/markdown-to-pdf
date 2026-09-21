@@ -42,7 +42,7 @@ function targetOf(el) {
 
 const PENCIL = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
 
-function PreviewPane({ html, vars, mode, zoom, pageNumbers, currentLine, caretDriven, onBlockClick, onEditStyle, onScrollLine, onPages, onFitZoom, bus, dim }) {
+function PreviewPane({ html, vars, mode, zoom, header, footer, currentLine, caretDriven, onBlockClick, onEditStyle, onScrollLine, onPages, onFitZoom, bus, dim }) {
   const scrollRef = useRefPV(null);
   const sheetsRef = useRefPV(null);
   const measureRef = useRefPV(null);
@@ -90,11 +90,11 @@ function PreviewPane({ html, vars, mode, zoom, pageNumbers, currentLine, caretDr
         await document.fonts.ready;
         if (!token()) return;
         const padY = parseFloat(getComputedStyle(measure).paddingTop) || 0;
-        const res = await Paginate.paginate(html, { measure, pageH: A4_H_PX, padY, pageNumbers, token });
+        const res = await Paginate.paginate(html, { measure, pageH: A4_H_PX, padY, header, footer, token });
         if (!res || !token() || cancelled) return;
         const keepScroll = scrollRef.current ? scrollRef.current.scrollTop : 0;
         sheets.replaceChildren(...res.sheets);
-        Paginate.verify(sheets, { pageNumbers });
+        Paginate.verify(sheets, { header, footer });
         if (scrollRef.current) scrollRef.current.scrollTop = keepScroll;
         setOverflow(res.overflow);
         const n = sheets.querySelectorAll(':scope > .sheet').length;
@@ -104,7 +104,7 @@ function PreviewPane({ html, vars, mode, zoom, pageNumbers, currentLine, caretDr
       } finally { if (token()) setBusy(false); }
     }, 25); // pagination is ~15ms for a 7-page document, so a short trailing debounce is enough
     return () => { cancelled = true; clearTimeout(t); };
-  }, [html, vars, pageNumbers, fontTick]);
+  }, [html, vars, header, footer, fontTick]);
 
   // current-block highlight from the editor caret
   const currentLineRef = useRefPV(currentLine);

@@ -188,5 +188,76 @@ Everything you see is plain Markdown in the left pane, plus a few extras: \`\\pa
 [^1]: He has asked not to be named, then named himself in every interview since.
 [^2]: The word "brakes" appears in the budget under "future work."
 `;
-  return { md, seed, FIGS };
+  const resume = `# Alex Nguyen
+
+**Senior Business Analyst** · Sydney, NSW\\
+0412 345 678 · alex.nguyen@example.com · linkedin.com/in/alexnguyen-ba
+
+Business analyst with nine years across financial services, health insurance and NSW public sector delivery. I turn ambiguous problems into clear requirements, workable options and measurable outcomes, and I am at my best where product, technology and operations meet. CBAP, PRINCE2 Practitioner, Certified Scrum Product Owner. Full Australian working rights.
+
+## Core skills
+
+| Analysis | Delivery | Tools |
+|---|---|---|
+| Requirements elicitation and prioritisation | Agile (Scrum, SAFe) and hybrid delivery | Jira, Confluence, Azure DevOps |
+| Process mapping (BPMN), current and target state | Backlog ownership and story writing | Miro, Visio, Figma |
+| Data analysis, SQL, reporting | Vendor and stakeholder management | SQL, Power BI, Excel |
+| Options papers and business cases | UAT planning and change enablement | Salesforce, Guidewire |
+
+## Experience
+
+### Senior Business Analyst — Harbourline Insurance, Sydney
+*March 2021 – present*
+
+- Led analysis for the claims platform replacement (Guidewire ClaimCenter), a $14M program serving 1.2M policyholders; owned requirements for intake, triage and payments across four squads.
+- Cut average claim lodgement time from 11 minutes to 4 by redesigning the digital intake flow; defined and tracked the metrics that proved it.
+- Ran fortnightly prioritisation with Claims Operations, Legal and Technology, keeping a 300-item backlog honest and traceable to the business case.
+- Mentored three analysts; introduced a lightweight requirements standard adopted across the program.
+
+### Business Analyst — Kestrel Digital (consultancy), Sydney
+*July 2018 – February 2021*
+
+- Engagements for a NSW Government agency (grants management), a superannuation fund (member portal) and a national retailer (order management).
+- Produced current-state process maps and target-state designs for the grants program, reducing application handling steps from 27 to 12.
+- Facilitated discovery workshops with up to 40 stakeholders; wrote the options paper that secured $3.2M in funding for the member portal.
+- Built Power BI dashboards that gave the retailer its first end-to-end view of order exceptions.
+
+### Business Analyst — Southern Cross Health Fund, Sydney
+*February 2016 – June 2018*
+
+- Requirements and UAT lead for the member self-service rollout (claims, cover changes, payments) on Salesforce.
+- Wrote 180+ user stories with acceptance criteria; coordinated UAT with 25 testers across three states, closing 340 defects before go-live.
+- Analysed call-centre data to identify the top ten drivers of contact; three fixes removed 18% of inbound volume.
+
+### Graduate Analyst — Southern Cross Health Fund, Sydney
+*February 2015 – January 2016*
+
+- Rotations through Product, Operations and Technology; supported regulatory reporting and process documentation.
+
+## Education and certifications
+
+**Bachelor of Commerce (Information Systems)** — University of New South Wales, 2014
+
+- Certified Business Analysis Professional (CBAP), IIBA — 2020
+- PRINCE2 Practitioner — 2019
+- Certified Scrum Product Owner (CSPO) — 2018
+- Microsoft Power BI Data Analyst Associate — 2022
+
+## Selected outcomes
+
+- **$14M claims platform** delivered on time; lodgement time down 64%.
+- **$3.2M business case** approved on first submission.
+- **18% reduction** in call-centre contacts from data-led fixes.
+
+## Referees
+
+Available on request.
+`;
+
+  const SAMPLES = [
+    { id: 'blank',  label: 'Blank',        note: 'An empty page',                     md: '',     theme: null },
+    { id: 'demo',   label: 'Demo article', note: 'Every element the editor knows',    md,         theme: 'report' },
+    { id: 'resume', label: 'Résumé',       note: 'Business Analyst, Sydney — a sample', md: resume, theme: 'resume' },
+  ];
+  return { md, resume, SAMPLES, seed, FIGS };
 })();

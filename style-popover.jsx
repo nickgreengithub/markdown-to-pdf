@@ -227,7 +227,7 @@ function Inspector({ target, vars, setVar, img }) {
 }
 
 /* the popover itself: anchored beside the clicked element, clamped to the viewport */
-function StylePopover({ target, anchorRect, bounds, vars, setVar, onReset, img, line, onClose, onSwitch, onGoto, onOpenLibrary }) {
+function StylePopover({ target, anchorRect, bounds, vars, setVar, onReset, img, line, onClose, onSwitch, onGoto }) {
   const ref = useRefSP(null);
   const [pos, setPos] = useStateSP({ left: -9999, top: -9999 });
   useLayoutEffectSP(() => {
@@ -281,7 +281,7 @@ function StylePopover({ target, anchorRect, bounds, vars, setVar, onReset, img, 
       {info ? <div className="stylepop-info">{info}</div> : <Inspector target={target} vars={vars} setVar={setVar} img={img} />}
       {target === 'image' && img && !img.name && <div className="stylepop-info">Select the image itself to size it.</div>}
       {target === 'image' && img && img.missing && (
-        <div className="stylepop-info"><b>{img.name}</b> is not in the image library, so nothing can be shown here. <button className="fmt small" onClick={onOpenLibrary}>Open the library</button></div>
+        <div className="stylepop-info"><b>{img.name}</b> is not in this browser's image store, so nothing can be shown. Paste or drop the image onto the editor to add it.</div>
       )}
       {(target === 'image') && img && img.name && <div className="stylepop-foot">Width and alignment are written into the markdown after the image.</div>}
     </div>

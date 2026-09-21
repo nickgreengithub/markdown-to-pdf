@@ -6,10 +6,10 @@ No build step, no backend, no accounts: everything stays in your browser.
 
 ## What it does
 
-- **Markdown pane** (CodeMirror 6): syntax colouring with the raw marks kept raw, a gutter
-  glyph per line saying what it is (click it for help and "change to…"), hover help on any
-  construct, `/` at the start of a line for the list of blocks, an insert toolbar, and a
-  syntax reference panel (`?`) that inserts examples at the caret.
+- **Markdown pane** (CodeMirror 6): syntax colouring with the raw marks kept raw. Type `/`
+  at the start of a line for the block menu (Suggested on top, filter as you type), or
+  click the `+` that appears beside the current line to change what that line is. Hover
+  any construct for help. Lines that reference an image show a thumbnail beneath them.
 - **Preview pane**: the document paginated onto A4 sheets, live. Single, two-up and grid
   views; zoom or fit-to-width. Tables continue across pages with the header repeated;
   lists and code blocks split at items and lines; a heading is never left at the bottom
@@ -19,8 +19,10 @@ No build step, no backend, no accounts: everything stays in your browser.
   the preview is a page break on paper. Optional page numbers.
 - **Styling**: click an element on the page for its controls (fonts, sizes, weights,
   spacing, colours, borders…); theme and page setup live in the top bar. Four themes.
-- **Images**: paste or drop an image anywhere and it goes into a library (IndexedDB, in
-  your browser) under a short name; the markdown refers to it as `![](name "Caption")`.
+- **Images**: paste or drop an image anywhere; it is stored in your browser under a short
+  name and `![](name)` lands at the caret, with a thumbnail under the line. Add a quoted
+  title for the caption. Nothing to manage; "Remove unused images" lives in the Document
+  menu.
 - **Persistence**: cache only — the markdown and your style choices live in
   `localStorage`, images in IndexedDB. Nothing is uploaded or saved anywhere else.
 

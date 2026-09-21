@@ -1,4 +1,4 @@
-/* global React, ReactDOM, THEMES, expandTheme, Dialect, Library, DEMO, MarkdownPane, PreviewPane, StylePopover, HoverMenu, RowStep, Toggle, RowIcon, LogoMark, PrintIcon, SingleIcon, SpreadIcon, GridIcon, CloseIcon, LibraryIcon, TurndownService, turndownPluginGfm */
+/* global React, ReactDOM, THEMES, expandTheme, Dialect, Library, DEMO, MarkdownPane, PreviewPane, StylePopover, HoverMenu, RowStep, Toggle, RowIcon, LogoMark, PrintIcon, SingleIcon, SpreadIcon, GridIcon, TurndownService, turndownPluginGfm */
 /* ============================================================
    App — top bar, the two panes, persistence, print.
    Markdown text is the only source of truth; everything else derives.
@@ -39,67 +39,6 @@ async function migrateLegacy() {
   return md;
 }
 
-/* ---- image library dialog ---- */
-function LibraryDialog({ onClose, onInsert, used, flash }) {
-  const [items, setItems] = useState(Library.list());
-  const [renaming, setRenaming] = useState(null);
-  const fileRef = useRef(null);
-  useEffect(() => Library.subscribe(() => setItems(Library.list())), []);
-  useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', onKey); return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
-  const unused = items.filter((i) => !used.has(i.name));
-  const addFiles = async (files) => {
-    for (const f of files) {
-      try { await Library.add(f); } catch { flash('Could not read ' + f.name); }
-    }
-  };
-  const kb = (n) => (n > 900000 ? (n / 1048576).toFixed(1) + ' MB' : Math.round(n / 1024) + ' KB');
-  return (
-    <div className="scrim" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
-      onDragOver={(e) => { e.preventDefault(); }} onDrop={(e) => { e.preventDefault(); addFiles([...e.dataTransfer.files].filter((f) => /^image\//.test(f.type))); }}>
-      <div className="libdlg">
-        <div className="libdlg-head">
-          <span className="libdlg-title">Image library <span className="libdlg-count">{items.length}</span></span>
-          <div className="libdlg-actions">
-            <button className="fmt small" onClick={() => fileRef.current && fileRef.current.click()}>Add image…</button>
-            {unused.length > 0 && <button className="fmt small" title="Delete images the document does not reference" onClick={() => { if (confirm(`Delete ${unused.length} unused image${unused.length === 1 ? '' : 's'}?`)) unused.forEach((i) => Library.remove(i.name)); }}>Remove unused ({unused.length})</button>}
-            <button className="fmt ico" onClick={onClose} title="Close"><CloseIcon /></button>
-          </div>
-        </div>
-        <div className="libdlg-hint">Refer to an image by name: <code>![alt](name "Caption")</code>. Pasting or dropping an image anywhere in the app adds it here and inserts it at the caret.</div>
-        <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => { addFiles([...e.target.files]); e.target.value = ''; }} />
-        {items.length === 0 ? (
-          <div className="libdlg-empty">No images yet. Paste one, drop one here, or use “Add image…”.</div>
-        ) : (
-          <div className="libgrid">
-            {items.map((it) => (
-              <div className={'libcard' + (used.has(it.name) ? '' : ' unused')} key={it.name}>
-                <div className="libthumb" onClick={() => onInsert(it.name)} title="Insert"><img src={it.url} alt={it.name} /></div>
-                <div className="libmeta">
-                  {renaming === it.name
-                    ? <input className="librename" autoFocus defaultValue={it.name}
-                        onKeyDown={async (e) => {
-                          if (e.key === 'Enter') { try { await Library.rename(it.name, e.target.value); } catch (err) { flash(err.message === 'name taken' ? 'That name is taken' : 'Could not rename'); } setRenaming(null); }
-                          if (e.key === 'Escape') setRenaming(null);
-                        }} onBlur={() => setRenaming(null)} />
-                    : <button className="libname" title="Rename" onClick={() => setRenaming(it.name)}>{it.name}</button>}
-                  <span className="libdim">{it.w && it.h ? `${it.w}×${it.h} · ` : ''}{kb(it.size)}{used.has(it.name) ? '' : ' · unused'}</span>
-                </div>
-                <div className="libbtns">
-                  <button className="fmt small primary" onClick={() => onInsert(it.name)}>Insert</button>
-                  <button className="fmt small" onClick={() => { if (confirm(`Delete “${it.name}”?`)) Library.remove(it.name); }}>Delete</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function App() {
   const t0 = THEMES[0];
   const [ready, setReady] = useState(false);
@@ -112,8 +51,7 @@ function App() {
     const base = expandTheme(getTheme(get(LS.theme, get('mdv2.theme', t0.id))).vars);
     return persisted ? { ...base, ...persisted, paper: '#ffffff' } : base;
   });
-  const [ui, setUi] = useState(() => ({ mode: 'single', zoom: null, split: 0.42, palette: 'full', pageNumbers: 'none', narrow: 'md', ...getJSON(LS.ui, {}) }));
-  const [libOpen, setLibOpen] = useState(false);
+  const [ui, setUi] = useState(() => ({ mode: 'single', zoom: null, split: 0.42, pageNumbers: 'none', narrow: 'md', ...getJSON(LS.ui, {}) }));
   const [toast, setToast] = useState('');
   const [stats, setStats] = useState({ pages: 1, words: 0 });
   const [currentLine, setCurrentLine] = useState(null);
@@ -153,6 +91,7 @@ function App() {
     return () => clearTimeout(t);
   }, [md, libTick, ready]);
   const usedImages = useMemo(() => new Set(dialect.images(md).map((i) => i.name)), [md]);
+  const unusedImages = useMemo(() => Library.list().filter((i) => !usedImages.has(i.name)), [usedImages, libTick]);
 
   const setVar = (k, v) => setVars((p) => ({ ...p, [k]: v }));
   const applyTheme = (t) => { setThemeId(t.id); setVars(expandTheme(t.vars)); flash(t.name + ' theme'); };
@@ -172,8 +111,8 @@ function App() {
   useEffect(() => {
     const imgs = (dt) => [...((dt && dt.files) || [])].filter((f) => /^image\//.test(f.type));
     const onPaste = (e) => { if (e.defaultPrevented || e.target.closest('.cm-editor, input, textarea')) return; const f = imgs(e.clipboardData); if (f.length) { e.preventDefault(); addImages(f); } };
-    const onDrop = (e) => { if (e.defaultPrevented || e.target.closest('.cm-editor, .libdlg')) return; const f = imgs(e.dataTransfer); if (f.length) { e.preventDefault(); addImages(f); } };
-    const onOver = (e) => { if (e.target.closest('.cm-editor, .libdlg')) return; if (imgs(e.dataTransfer).length || (e.dataTransfer && [...e.dataTransfer.types].includes('Files'))) e.preventDefault(); };
+    const onDrop = (e) => { if (e.defaultPrevented || e.target.closest('.cm-editor')) return; const f = imgs(e.dataTransfer); if (f.length) { e.preventDefault(); addImages(f); } };
+    const onOver = (e) => { if (e.target.closest('.cm-editor')) return; if (imgs(e.dataTransfer).length || (e.dataTransfer && [...e.dataTransfer.types].includes('Files'))) e.preventDefault(); };
     window.addEventListener('paste', onPaste); window.addEventListener('drop', onDrop); window.addEventListener('dragover', onOver);
     return () => { window.removeEventListener('paste', onPaste); window.removeEventListener('drop', onDrop); window.removeEventListener('dragover', onOver); };
   }, [addImages]);
@@ -265,14 +204,17 @@ function App() {
       <header className="topbar">
         <div className="tb-left">
           <span className="brand"><LogoMark /><span>Markdown Studio</span></span>
-          <button className="fmt tb-btn" title="Image library" onClick={() => setLibOpen(true)}><LibraryIcon /><span>Images</span></button>
           <HoverMenu className="tsel-menu" button={<span>Document</span>}>
             {(close) => (
               <div className="tsel-group">
                 <button className="tsel-item" onClick={() => { close(); loadDemo(); }}><span className="tsel-name">Load the demo article</span><span className="tsel-cur">every element</span></button>
                 <button className="tsel-item" onClick={() => { close(); startBlank(); }}><span className="tsel-name">Start blank</span></button>
-                <button className="tsel-item" onClick={() => { close(); setLibOpen(true); }}><span className="tsel-name">Image library…</span></button>
-                <div className="tsel-note">Everything is kept in this browser only — nothing is uploaded or saved elsewhere.</div>
+                {unusedImages.length > 0 && (
+                  <button className="tsel-item" onClick={() => { close(); if (confirm(`Delete ${unusedImages.length} image${unusedImages.length === 1 ? '' : 's'} the document no longer references?`)) unusedImages.forEach((i) => Library.remove(i.name)); }}>
+                    <span className="tsel-name">Remove unused images</span><span className="tsel-cur">{unusedImages.length}</span>
+                  </button>
+                )}
+                <div className="tsel-note">Everything is kept in this browser only — nothing is uploaded or saved elsewhere. Paste or drop an image anywhere to add it.</div>
               </div>
             )}
           </HoverMenu>
@@ -324,8 +266,7 @@ function App() {
 
       <div className="split" ref={splitRef}>
         <div className="pane pane-md" style={{ width: (ui.split * 100) + '%' }}>
-          <MarkdownPane initial={initialMd} bus={bus} onDocChange={setMd} onCaret={onCaret} onImageFiles={(files) => addImages(files)}
-            palette={ui.palette} setPalette={(m) => setU({ palette: m })} />
+          <MarkdownPane initial={initialMd} bus={bus} onDocChange={setMd} onCaret={onCaret} onImageFiles={(files) => addImages(files)} />
         </div>
         <div className="divider" onMouseDown={onDividerDown} title="Drag to resize" />
         <div className="pane pane-pv">
@@ -344,11 +285,8 @@ function App() {
         <StylePopover target={popover.target} anchorRect={popover.anchorRect} bounds={bus.current.pv && bus.current.pv.root() ? bus.current.pv.root().getBoundingClientRect() : null}
           vars={vars} setVar={setVar} onReset={resetKeys} img={imgCtx} line={popover.line}
           onClose={() => setPopover(null)} onSwitch={(t) => setPopover((p) => ({ ...p, target: t }))}
-          onGoto={(l) => bus.current.md && bus.current.md.gotoLine(l, { focus: true })}
-          onOpenLibrary={() => { setPopover(null); setLibOpen(true); }} />
+          onGoto={(l) => bus.current.md && bus.current.md.gotoLine(l, { focus: true })} />
       )}
-      {libOpen && <LibraryDialog onClose={() => setLibOpen(false)} used={usedImages} flash={flash}
-        onInsert={(name) => { setLibOpen(false); bus.current.md.insert(`![](${name} "Caption")`, true); }} />}
       <div className={'toast' + (toast ? ' show' : '')}>{toast}</div>
     </div>
   );

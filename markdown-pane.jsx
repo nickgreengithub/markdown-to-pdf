@@ -1,14 +1,16 @@
-/* global React, CM, SYNTAX */
+/* global React, CM, SYNTAX, Library */
 /* ============================================================
    Markdown pane — the only place the document is edited.
 
    CodeMirror 6 with:
    - markdown syntax colouring (the raw marks stay raw)
+   - "/" at the start of a line opens the block menu in the body:
+     sectioned, scrollable, filtered as you type, Suggested on top
+   - a "+" handle on the active line opens the same menu for that line
+   - "\" completes the layout directives
    - hover help on any construct, with "change to…" for line-level ones
-   - "\" at the start of a line completes the layout directives
-   - a palette under the editor showing every construct at once; the one
-     under the caret lights up, and clicking one inserts it
-   - paste / drop of image files handed to the app (→ image library)
+   - a thumbnail under every line that references an image
+   - paste / drop of image files handed to the app
    ============================================================ */
 const { useState: useStateMP, useEffect: useEffectMP, useRef: useRefMP } = React;
 
@@ -181,9 +183,17 @@ function constructAt(view, pos) {
   return null;
 }
 
-function buildExtensions({ onDocChange, onCaret, onImageFiles, bus }) {
-  const { EditorView, keymap, lineNumbers, drawSelection, highlightActiveLine, highlightActiveLineGutter, Decoration, ViewPlugin, hoverTooltip, placeholder,
-    defaultKeymap, history, historyKeymap, indentWithTab, markdown, markdownLanguage, markdownKeymap, syntaxHighlighting, HighlightStyle, autocompletion, completionKeymap,
+/* the block menu: sections in display order; Suggested first, everything once */
+const MENU = [
+  ['Suggested', ['h1', 'h2', 'h3', 'p', 'ul', 'ol', 'image', 'pagebreak']],
+  ['Blocks',    ['h4', 'quote', 'fence', 'table', 'hr', 'task', 'vspace', 'footnote']],
+  ['Text',      ['bold', 'italic', 'strike', 'code', 'link', 'br', 'imageAttrs']],
+];
+const libTick = CM.StateEffect.define();
+
+function buildExtensions({ onDocChange, onCaret, onImageFiles }) {
+  const { EditorView, keymap, drawSelection, highlightActiveLine, highlightActiveLineGutter, Decoration, ViewPlugin, WidgetType, hoverTooltip, placeholder, gutter, GutterMarker,
+    defaultKeymap, history, historyKeymap, indentWithTab, markdown, markdownLanguage, syntaxHighlighting, HighlightStyle, autocompletion, completionKeymap, startCompletion,
     searchKeymap, highlightSelectionMatches, tags: t, Prec } = CM;
 
   const style = HighlightStyle.define([
@@ -205,7 +215,7 @@ function buildExtensions({ onDocChange, onCaret, onImageFiles, bus }) {
     { tag: t.labelName, color: 'var(--md-mark)' },
   ]);
 
-  /* which lines are inside a fenced code block (they get a flat background) */
+  /* which lines are inside a fenced code block */
   let inFenceCache = { doc: null, lines: null };
   const fenceLines = (state) => {
     if (inFenceCache.doc === state.doc) return inFenceCache.lines;
@@ -226,19 +236,21 @@ function buildExtensions({ onDocChange, onCaret, onImageFiles, bus }) {
     return { pos: c.from, end: c.to, above: true, create: () => ({ dom: helpDOM(view, c.id, c.line) || document.createElement('div') }) };
   }, { hoverTime: 350 });
 
-  /* directive lines and code-block lines get a background */
+  /* line backgrounds: directives, code, and the hint on an empty active line */
   const lineDeco = ViewPlugin.fromClass(class {
     constructor(view) { this.decorations = this.build(view); }
-    update(u) { if (u.docChanged || u.viewportChanged) this.decorations = this.build(u.view); }
+    update(u) { if (u.docChanged || u.viewportChanged || u.selectionSet || u.focusChanged) this.decorations = this.build(u.view); }
     build(view) {
       const b = new CM.RangeSetBuilder();
       const fences = fenceLines(view.state);
+      const cur = view.state.doc.lineAt(view.state.selection.main.head);
       for (const { from, to } of view.visibleRanges) {
         for (let pos = from; pos <= to;) {
           const line = view.state.doc.lineAt(pos);
           if (!fences.has(line.number)) {
             if (/^\\pagebreak\s*$/.test(line.text)) b.add(line.from, line.from, Decoration.line({ class: 'cm-line-pagebreak' }));
             else if (/^\\(vspace(\s+\d+)?)?\s*$/.test(line.text)) b.add(line.from, line.from, Decoration.line({ class: 'cm-line-vspace' }));
+            else if (line.number === cur.number && !line.text && view.hasFocus && view.state.doc.length > 0) b.add(line.from, line.from, Decoration.line({ class: 'cm-line-hint' }));
           } else if (!/^\s*(```|~~~)/.test(line.text)) b.add(line.from, line.from, Decoration.line({ class: 'cm-line-code' }));
           pos = line.to + 1;
         }
@@ -247,30 +259,90 @@ function buildExtensions({ onDocChange, onCaret, onImageFiles, bus }) {
     }
   }, { decorations: (v) => v.decorations });
 
-  /* "\\" at the start of a line → the layout directives (completes what is being typed) */
+  /* the block menu: "/" at the start of a line, "\" for directives, or opened
+     explicitly from the line handle */
+  let menuOptions;
+  menuOptions = (items, slashAt) => items.map(({ it, section, rank, boost }) => ({
+    label: it.label, detail: it.syntax.split('\n')[0], type: it.id, boost,
+    section: { name: section, rank },
+    apply: (view, c, f, to) => {
+      anchor = null;
+      view.dispatch({ changes: { from: slashAt != null ? slashAt : f, to, insert: '' } });
+      MD.apply(view, it);
+    },
+  }));
+  // where a handle-opened menu started, so the typed filter is known without a "/"
+  let anchor = null;
   const blockSource = (ctx) => {
     const line = ctx.state.doc.lineAt(ctx.pos);
     const before = line.text.slice(0, ctx.pos - line.from);
-    const m = /^(\s*)(\\)([\w-]*)$/.exec(before);
-    if (!m) return null;
-    // the backslash stays out of the filter text; apply() removes it
-    const slashAt = line.from + m[1].length;
-    const from = slashAt + 1;
-    const items = SYNTAX.ITEMS.filter((i) => i.group === 'Layout');
-    return {
-      from,
-      options: items.map((i) => ({
-        label: i.label, detail: i.syntax.split('\n')[0], type: 'block', info: i.desc.replace(/`/g, ''),
-        boost: i.group === 'Headings' ? 2 : 0,
-        apply: (view, c, f, to) => {
-          view.dispatch({ changes: { from: slashAt != null ? slashAt : f, to, insert: '' } });
-          MD.apply(view, i);
-        },
-      })),
-      filter: true,
-      validFor: /^[\w-]*$/,
-    };
+    const m = /^(\s*)([\/\\])([\w-]*)$/.exec(before);
+    let slashAt = null, from;
+    if (m) { slashAt = line.from + m[1].length; from = slashAt + 1; }
+    else if (ctx.explicit) { anchor = { line: line.number, from: ctx.pos }; from = ctx.pos; }
+    else if (anchor && anchor.line === line.number && ctx.pos >= anchor.from && /^[\w\- ]*$/.test(ctx.state.sliceDoc(anchor.from, ctx.pos))) from = anchor.from;
+    else return null;
+    let items;
+    if (m && m[2] === '\\') items = SYNTAX.ITEMS.filter((i) => i.group === 'Layout').map((it, k) => ({ it, section: 'Layout', rank: 0, boost: 99 - k }));
+    else items = MENU.flatMap(([section, ids], r) => ids.map((id, k) => ({ it: SYNTAX.byId[id], section, rank: r, boost: 99 - k })));
+    return { from, options: menuOptions(items, slashAt), filter: true, validFor: /^[\w\- ]*$/ };
   };
+
+  /* the "+" handle: visible on the active or hovered line, opens the menu for it */
+  class Handle extends GutterMarker {
+    toDOM() { const s = document.createElement('span'); s.className = 'cm-handle'; s.textContent = '+'; s.title = 'Change this line, or insert a block'; return s; }
+  }
+  const handle = new Handle();
+  const handleGutter = gutter({
+    class: 'cm-handle-gutter',
+    lineMarker: () => handle,
+    lineMarkerChange: () => false,
+    initialSpacer: () => handle,
+    domEventHandlers: {
+      mousedown(view, line, e) {
+        e.preventDefault();
+        const l = view.state.doc.lineAt(line.from);
+        view.dispatch({ selection: { anchor: l.from } });
+        view.focus();
+        startCompletion(view);
+        return true;
+      },
+    },
+  });
+
+  /* thumbnails under lines that reference images */
+  const REF_RE = /!\[[^\]]*\]\(\s*([^)\s"]+)/g;
+  class Thumbs extends WidgetType {
+    constructor(names) { super(); this.names = names; }
+    eq(o) { return o.names.join('|') === this.names.join('|') && o.urls === this.urls; }
+    get urls() { return this.names.map((n) => Library.urlFor(n) || (/^(https?:|data:|blob:)/.test(n) ? n : '')).join('|'); }
+    toDOM() {
+      const box = document.createElement('div'); box.className = 'cm-thumbs';
+      this.names.forEach((n) => {
+        const url = Library.urlFor(n) || (/^(https?:|data:|blob:)/.test(n) ? n : null);
+        if (url) { const im = document.createElement('img'); im.src = url; im.alt = n; im.title = n; im.draggable = false; box.appendChild(im); }
+        else { const c = document.createElement('span'); c.className = 'cm-thumb-missing'; c.textContent = n + ' — not in this browser; paste the image again'; box.appendChild(c); }
+      });
+      return box;
+    }
+    ignoreEvent() { return true; }
+  }
+  const thumbDecos = (state) => {
+    const b = new CM.RangeSetBuilder();
+    const fences = fenceLines(state);
+    for (let i = 1; i <= state.doc.lines; i++) {
+      const line = state.doc.line(i);
+      if (fences.has(i) || line.text.indexOf('![') < 0) continue;
+      const names = [...line.text.matchAll(REF_RE)].map((m) => m[1]);
+      if (names.length) b.add(line.to, line.to, Decoration.widget({ widget: new Thumbs(names), block: true, side: 1 }));
+    }
+    return b.finish();
+  };
+  const thumbs = CM.StateField.define({
+    create: (state) => thumbDecos(state),
+    update: (v, tr) => (tr.docChanged || tr.effects.some((e) => e.is(libTick)) ? thumbDecos(tr.state) : v),
+    provide: (f) => EditorView.decorations.from(f),
+  });
 
   const events = EditorView.domEventHandlers({
     paste(e, view) {
@@ -297,13 +369,13 @@ function buildExtensions({ onDocChange, onCaret, onImageFiles, bus }) {
   const shortcuts = SYNTAX.ITEMS.filter((i) => i.key).map((i) => ({ key: i.key, run: (v) => { MD.apply(v, i); return true; } }));
 
   return [
-    lineNumbers(), highlightActiveLineGutter(), highlightActiveLine(), drawSelection(), history(),
+    handleGutter, highlightActiveLineGutter(), highlightActiveLine(), drawSelection(), history(),
     markdown({ base: markdownLanguage, addKeymap: true }),
     syntaxHighlighting(style),
     EditorView.lineWrapping,
-    placeholder('Start writing. Paste an image anywhere.'),
-    lineDeco, hover,
-    autocompletion({ override: [blockSource], activateOnTyping: true, icons: false, maxRenderedOptions: 30, defaultKeymap: true }),
+    placeholder('Start writing, or type / for blocks. Paste an image anywhere.'),
+    lineDeco, thumbs, hover,
+    autocompletion({ override: [blockSource], activateOnTyping: true, icons: true, maxRenderedOptions: 40, defaultKeymap: true, closeOnBlur: true }),
     highlightSelectionMatches(),
     events,
     Prec.high(keymap.of(shortcuts)),
@@ -312,6 +384,7 @@ function buildExtensions({ onDocChange, onCaret, onImageFiles, bus }) {
       if (u.docChanged) onDocChange(u.state.doc.toString());
       if (u.docChanged || u.selectionSet || u.focusChanged) {
         const head = u.state.selection.main.head;
+        if (anchor && u.state.doc.lineAt(head).number !== anchor.line) anchor = null;
         const c = constructAt(u.view, head);
         onCaret(u.state.doc.lineAt(head).number - 1, u.view.hasFocus, {
           line: SYNTAX.detectLine(u.state.doc.lineAt(head).text) || 'p',
@@ -323,7 +396,7 @@ function buildExtensions({ onDocChange, onCaret, onImageFiles, bus }) {
 }
 
 /* ---------- the pane ---------- */
-function MarkdownPane({ initial, onDocChange, onCaret, onImageFiles, bus, palette, setPalette }) {
+function MarkdownPane({ initial, onDocChange, onCaret, onImageFiles, bus }) {
   const host = useRefMP(null);
   const viewRef = useRefMP(null);
   const cbs = useRefMP({});
@@ -343,6 +416,7 @@ function MarkdownPane({ initial, onDocChange, onCaret, onImageFiles, bus, palett
       parent: host.current,
     });
     viewRef.current = view;
+    const unsub = Library.subscribe(() => view.dispatch({ effects: libTick.of(null) })); // thumbnails follow the store
     bus.current.md = {
       view,
       getDoc: () => view.state.doc.toString(),
@@ -369,46 +443,18 @@ function MarkdownPane({ initial, onDocChange, onCaret, onImageFiles, bus, palett
       },
       undo: () => CM.undo(view), redo: () => CM.redo(view),
     };
-    return () => { view.destroy(); bus.current.md = null; };
+    return () => { unsub(); view.destroy(); bus.current.md = null; };
   }, []);
 
-  const run = (id) => { const v = viewRef.current; if (v) MD.apply(v, SYNTAX.byId[id]); };
-  const open = palette !== 'hidden';
+  const cur = active.focused ? SYNTAX.byId[active.inline || active.line] : null;
   return (
     <div className="mdpane">
       <div className="pane-head">
-        <button className={'pane-tab' + (open ? ' on' : '')} title={open ? 'Hide the syntax column' : 'Show the syntax column'} onMouseDown={(e) => { e.preventDefault(); setPalette(open ? 'hidden' : 'full'); }}>Syntax</button>
         <span className="pane-title">Markdown</span>
-        <span className="pane-note">{active.focused ? (SYNTAX.byId[active.inline || active.line] || {}).label || '' : ''}</span>
+        <span className="pane-note">{cur ? cur.label : ''}</span>
+        <span className="pane-hint">Type / for blocks</span>
       </div>
-      <div className="mdbody">
-        {open && <Palette active={active} onInsert={run} />}
-        <div className="cm-host" ref={host} />
-      </div>
+      <div className="cm-host" ref={host} />
     </div>
-  );
-}
-
-/* One column, one row per construct: the syntax you type, lit when the
-   caret is in it. A note only where the symbol alone says nothing. */
-function Palette({ active, onInsert }) {
-  const isMac = navigator.platform.includes('Mac');
-  const lit = (it) => active.focused && (it.id === active.line || it.id === active.inline || (it.id === 'vspace' && active.line === 'vspaceN'));
-  return (
-    <aside className="palette">
-      {SYNTAX.GROUPS.map((g) => (
-        <div className="pal-group" key={g.label}>
-          <div className="pal-glabel">{g.label}</div>
-          {g.items.map((it) => (
-            <button key={it.id} className={'pal-row' + (lit(it) ? ' on' : '')}
-              title={it.label + ' — ' + it.desc.replace(/`/g, '') + (it.key ? '  (' + it.key.replace('Mod', isMac ? '⌘' : 'Ctrl') + ')' : '')}
-              onMouseDown={(e) => { e.preventDefault(); onInsert(it.id); }}>
-              <code className="pal-syntax">{it.syntax.split('\n')[0]}</code>
-              {it.note && <span className="pal-note">{it.note}</span>}
-            </button>
-          ))}
-        </div>
-      ))}
-    </aside>
   );
 }

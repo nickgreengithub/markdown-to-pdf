@@ -35,10 +35,12 @@ zero build step for the app, and cache-only persistence.
 ```
 
 - **Markdown pane** (left, CodeMirror 6). Editing happens here and only here. Raw syntax
-  stays raw; colouring and gutter marks are the only decoration. Helpers: an insert
-  toolbar, new-line / `\` autocomplete listing every block type, hover and gutter-click
-  help on tokens with "change to…" variants, and a `?` syntax reference that inserts
-  examples at the caret.
+  stays raw; colouring is the only decoration. Helpers: `/` at the start of a line opens
+  a block menu in the body (sectioned, scrollable, filtered as you type, Suggested on
+  top); a `+` handle on the active line opens the same menu for that line; `\` completes
+  the layout directives; hover help with "change to…" variants. A line that references
+  an image shows a thumbnail beneath it. The pane header names the construct under the
+  caret; the page shows it as a tag above the outlined block.
 - **Preview pane** (right). Read-only, live (debounced). Modes: single, spread (two-up),
   grid (fit several across, forced page breaks marked). Zoom with fit-width / fit-page.
 - **Linking.** Rendered blocks carry `data-line`. Caret movement highlights the block and
@@ -114,5 +116,9 @@ print resolve names to object URLs. Demo figures are seeded into the library.
   around it. Floats would put content outside the flow the paginator measures.
 - Paragraphs move to the next page whole; there is no widow / orphan splitting yet.
 - A `\pagebreak` on the last line leaves a blank trailing page, on purpose.
-- The gutter glyph doubles as the "what is this line" affordance; hover help covers inline
-  constructs. Both share the same content as the `/` menu and the reference panel.
+- Discoverability went through three forms — gutter glyphs + toolbar + reference panel,
+  then an always-visible palette, then a syntax sidebar — and settled on the in-body `/`
+  menu plus the line handle: nothing permanent on screen, everything one keystroke away.
+- There is no image gallery. Pasted images are stored by name in the browser; the
+  reference in the text is the only handle, with a thumbnail under it. "Remove unused
+  images" in the Document menu is the only housekeeping.

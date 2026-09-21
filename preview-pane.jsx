@@ -40,7 +40,9 @@ function targetOf(el) {
   return 'p';
 }
 
-function PreviewPane({ html, vars, mode, zoom, pageNumbers, currentLine, caretDriven, onBlockClick, onScrollLine, onPages, onFitZoom, bus, dim }) {
+const PENCIL = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+
+function PreviewPane({ html, vars, mode, zoom, pageNumbers, currentLine, caretDriven, onBlockClick, onEditStyle, onScrollLine, onPages, onFitZoom, bus, dim }) {
   const scrollRef = useRefPV(null);
   const sheetsRef = useRefPV(null);
   const measureRef = useRefPV(null);
@@ -107,6 +109,8 @@ function PreviewPane({ html, vars, mode, zoom, pageNumbers, currentLine, caretDr
   // current-block highlight from the editor caret
   const currentLineRef = useRefPV(currentLine);
   currentLineRef.current = currentLine;
+  const editRef = useRefPV(onEditStyle);
+  editRef.current = onEditStyle;
   const caretDrivenRef = useRefPV(caretDriven);
   caretDrivenRef.current = caretDriven;
   useEffectPV(() => { if (sheetsRef.current) applyCurrent(sheetsRef.current, currentLine, caretDriven); }, [currentLine, caretDriven]);
@@ -126,15 +130,24 @@ function PreviewPane({ html, vars, mode, zoom, pageNumbers, currentLine, caretDr
     }
     if (!best) return;
     best.classList.add('is-current');
-    // a small tag above the frame's top-right corner saying what the block is
+    // a tag above the frame's top-right corner saying what the block is;
+    // clicking it opens that block's controls in the Theme tab
     const doc = best.closest('.doc');
     if (doc) {
       sheets.querySelectorAll('.cur-tag').forEach((n) => n.remove());
-      const tag = document.createElement('span');
+      const kind = targetOf(best);
+      const tag = document.createElement('button');
       tag.className = 'cur-tag';
-      tag.textContent = TARGET_LABEL[targetOf(best)] || 'Block';
+      tag.type = 'button';
+      tag.title = 'Edit the style of every ' + (TARGET_LABEL[kind] || 'block').toLowerCase();
+      tag.innerHTML = '<span>' + (TARGET_LABEL[kind] || 'Block') + '</span>' + PENCIL;
       tag.style.top = (best.offsetTop - 26) + 'px';
       tag.style.right = (doc.clientWidth - best.offsetLeft - best.offsetWidth - 7) + 'px';
+      tag.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+      tag.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        if (editRef.current) editRef.current({ kind, line: +best.dataset.line });
+      });
       doc.appendChild(tag);
     }
     if (scroll) {

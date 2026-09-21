@@ -59,10 +59,13 @@
 /* the block the editor caret is in, and its tag above the frame */
 .sheet .is-current { outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent); outline-offset: 5px; border-radius: 2px; }
 .sheet .cur-tag {
-  position: absolute; padding: 1px 7px; border-radius: 99px; pointer-events: none; z-index: 3;
-  font: 600 9px/1.5 system-ui, sans-serif; letter-spacing: .05em; text-transform: uppercase;
-  color: #fff; background: color-mix(in srgb, var(--accent) 80%, #000); white-space: nowrap;
+  position: absolute; display: inline-flex; align-items: center; gap: 5px; height: 17px; padding: 0 6px 0 8px; border: 0; border-radius: 99px; z-index: 3;
+  font: 600 9px/1 system-ui, sans-serif; letter-spacing: .05em; text-transform: uppercase; cursor: pointer;
+  color: #fff; background: color-mix(in srgb, var(--accent) 80%, #000); white-space: nowrap; transition: background .1s, transform .1s;
 }
+.sheet .cur-tag svg { display: block; opacity: .9; }
+.sheet .cur-tag:hover { background: var(--accent); transform: translateY(-1px); }
+.sheet .cur-tag:hover svg { opacity: 1; }
 .sheet .doc > * { cursor: default; }
 
 /* ---- typography ---------------------------------------------------------- */

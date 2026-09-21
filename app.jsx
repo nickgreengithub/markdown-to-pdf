@@ -126,6 +126,11 @@ function App() {
     setCurrentLine(info.line);
     setPageFocus({ line: info.line, kind: info.kind, at: Date.now() });
   };
+  // the tag above an outlined block: open its controls in the Theme tab
+  const onEditStyle = useCallback(({ kind, line }) => {
+    setU({ tab: 'theme' });
+    setPageFocus({ line, kind, at: Date.now() });
+  }, []);
   const onCaret = useCallback((line, focused) => { setCurrentLine(line); setEditorFocused(focused); if (focused) setPageFocus(null); }, []);
   // the outline on the page exists while the editor has focus, or after a click on the page
   const highlightLine = editorFocused ? currentLine : (pageFocus ? pageFocus.line : null);
@@ -270,7 +275,7 @@ function App() {
             <span className="pane-hint">Click anything on the page to go to its source</span>
           </div>
           <PreviewPane html={html} vars={pageVars} mode={ui.mode} zoom={ui.zoom} pageNumbers={ui.pageNumbers}
-            currentLine={highlightLine} caretDriven={editorFocused} onBlockClick={onBlockClick} onScrollLine={onScrollLine}
+            currentLine={highlightLine} caretDriven={editorFocused} onBlockClick={onBlockClick} onEditStyle={onEditStyle} onScrollLine={onScrollLine}
             onPages={onPages} onFitZoom={onFitZoom} bus={bus} />
         </div>
       </div>

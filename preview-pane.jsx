@@ -102,7 +102,7 @@ function PreviewPane({ html, vars, mode, zoom, pageNumbers, currentLine, caretDr
         // while the author is typing, keep the block under the caret in view
         applyCurrent(sheets, currentLineRef.current, caretDrivenRef.current, true);
       } finally { if (token()) setBusy(false); }
-    }, 120);
+    }, 25); // pagination is ~15ms for a 7-page document, so a short trailing debounce is enough
     return () => { cancelled = true; clearTimeout(t); };
   }, [html, vars, pageNumbers, fontTick]);
 

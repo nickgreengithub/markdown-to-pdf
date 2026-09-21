@@ -51,8 +51,7 @@ function App() {
     const base = expandTheme(getTheme(get(LS.theme, get('mdv2.theme', t0.id))).vars);
     return persisted ? { ...base, ...persisted, paper: '#ffffff' } : base;
   });
-  const [ui, setUi] = useState(() => ({ mode: 'single', zoom: null, split: 0.42, pageNumbers: 'none', narrow: 'md', dark: false, tab: 'md', ...getJSON(LS.ui, {}) }));
-  useEffect(() => { document.documentElement.dataset.ui = ui.dark ? 'dark' : 'light'; }, [ui.dark]);
+  const [ui, setUi] = useState(() => ({ mode: 'single', zoom: null, split: 0.42, pageNumbers: 'none', narrow: 'md', tab: 'md', ...getJSON(LS.ui, {}) }));
   const [toast, setToast] = useState('');
   const [stats, setStats] = useState({ pages: 1, words: 0 });
   const [fitZoom, setFitZoom] = useState(1);
@@ -242,7 +241,6 @@ function App() {
             <button className={ui.narrow === 'md' ? 'sel' : ''} onClick={() => setU({ narrow: 'md' })}>Edit</button>
             <button className={ui.narrow === 'pv' ? 'sel' : ''} onClick={() => setU({ narrow: 'pv' })}>Preview</button>
           </div>
-          <button className="fmt ico" title={ui.dark ? 'Light interface' : 'Dark interface'} onClick={() => setU({ dark: !ui.dark })}>{ui.dark ? '☀' : '☾'}</button>
           <button className="fmt primary-fmt" title={'Print / save as PDF  (' + (isMac ? '⌘' : 'Ctrl+') + 'P)'} onClick={doPrint}><PrintIcon /><span>Print</span></button>
         </div>
       </header>

@@ -88,7 +88,7 @@ function App() {
   const [html, setHtml] = useState('');
   useEffect(() => {
     if (!ready) return;
-    const t = setTimeout(() => setHtml(dialect.render(md)), 90);
+    const t = setTimeout(() => setHtml(dialect.render(md)), 20); // render is a few ms; keep the preview close behind the caret
     return () => clearTimeout(t);
   }, [md, libTick, ready]);
   const usedImages = useMemo(() => new Set(dialect.images(md).map((i) => i.name)), [md]);

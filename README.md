@@ -17,8 +17,10 @@ No build step, no backend, no accounts: everything stays in your browser.
   caret to its source.
 - **Print = preview**: the PDF is made from the very sheets you see, so a page break in
   the preview is a page break on paper. Optional page numbers.
-- **Styling**: click an element on the page for its controls (fonts, sizes, weights,
-  spacing, colours, borders…); theme and page setup live in the top bar. Four themes.
+- **Styling**: the left pane's THEME tab holds the theme picker and every control —
+  page, each heading level, body text, lists, quote, code, table, rule, images, captions,
+  links, footnotes, colours — all on one page, grouped like the block menu. Click an
+  element on the page and its section scrolls into view. Four themes.
 - **Images**: paste or drop an image anywhere; it is stored in your browser under a short
   name and `![](name)` lands at the caret, with a thumbnail under the line. Add a quoted
   title for the caption. Nothing to manage; "Remove unused images" lives in the Document

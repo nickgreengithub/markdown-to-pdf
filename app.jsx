@@ -51,14 +51,15 @@ function App() {
     const base = expandTheme(getTheme(get(LS.theme, get('mdv2.theme', t0.id))).vars);
     return persisted ? { ...base, ...persisted, paper: '#ffffff' } : base;
   });
-  const [ui, setUi] = useState(() => ({ mode: 'single', zoom: null, split: 0.42, pageNumbers: 'none', narrow: 'md', ...getJSON(LS.ui, {}) }));
+  const [ui, setUi] = useState(() => ({ mode: 'single', zoom: null, split: 0.42, pageNumbers: 'none', narrow: 'md', dark: true, ...getJSON(LS.ui, {}) }));
+  useEffect(() => { document.documentElement.dataset.ui = ui.dark ? 'dark' : 'light'; }, [ui.dark]);
   const [toast, setToast] = useState('');
   const [stats, setStats] = useState({ pages: 1, words: 0 });
+  const [fitZoom, setFitZoom] = useState(1);
   const [currentLine, setCurrentLine] = useState(null);
   const [editorFocused, setEditorFocused] = useState(false);
   const [popover, setPopover] = useState(null);
   const bus = useRef({});
-  const fitRef = useRef(1);
   const splitRef = useRef(null);
 
   const flash = useCallback((m) => { setToast(m); clearTimeout(flash._t); flash._t = setTimeout(() => setToast(''), 1600); }, []);
@@ -129,7 +130,11 @@ function App() {
   // the outline on the page exists only while the editor has focus or a popover is open
   const highlightLine = popover ? popover.line : (editorFocused ? currentLine : null);
   const onScrollLine = useCallback((line) => { if (bus.current.md && !bus.current.md.view.hasFocus) bus.current.md.scrollToLine(line); }, []);
-  const onPages = useCallback((n, text) => setStats({ pages: n, words: (text.trim().match(/\S+/g) || []).length }), []);
+  const onPages = useCallback((n, text) => {
+    const words = (text.trim().match(/\S+/g) || []).length;
+    setStats((s) => (s.pages === n && s.words === words ? s : { pages: n, words })); // same numbers: no re-render
+  }, []);
+  const onFitZoom = useCallback((z) => setFitZoom(z), []);
 
   // image attributes live in the markdown; the popover edits them there
   const imgCtx = useMemo(() => {
@@ -194,9 +199,10 @@ function App() {
     bus.current.md.setDoc(''); setMd(''); bus.current.md.focus();
   };
 
-  const zoomShown = ui.zoom == null ? fitRef.current : ui.zoom;
+  const zoomShown = ui.zoom == null ? fitZoom : ui.zoom;
   const nudge = (d) => setU({ zoom: Math.max(0.15, Math.min(2.5, Math.round((zoomShown + d) * 100) / 100)) });
-  const pageVars = {}; Object.keys(vars).forEach((k) => { pageVars['--' + k] = vars[k]; });
+  // one object per change of vars: the preview re-paginates when this identity changes
+  const pageVars = useMemo(() => { const o = {}; Object.keys(vars).forEach((k) => { o['--' + k] = vars[k]; }); return o; }, [vars]);
 
   if (!ready) return <div className="app booting" />;
   return (
@@ -260,6 +266,7 @@ function App() {
             <button className={ui.narrow === 'md' ? 'sel' : ''} onClick={() => setU({ narrow: 'md' })}>Edit</button>
             <button className={ui.narrow === 'pv' ? 'sel' : ''} onClick={() => setU({ narrow: 'pv' })}>Preview</button>
           </div>
+          <button className="fmt ico" title={ui.dark ? 'Light interface' : 'Dark interface'} onClick={() => setU({ dark: !ui.dark })}>{ui.dark ? '☀' : '☾'}</button>
           <button className="fmt primary-fmt" title={'Print / save as PDF  (' + (isMac ? '⌘' : 'Ctrl+') + 'P)'} onClick={doPrint}><PrintIcon /><span>Print</span></button>
         </div>
       </header>
@@ -277,7 +284,7 @@ function App() {
           </div>
           <PreviewPane html={html} vars={pageVars} mode={ui.mode} zoom={ui.zoom} pageNumbers={ui.pageNumbers}
             currentLine={highlightLine} caretDriven={editorFocused} onBlockClick={onBlockClick} onScrollLine={onScrollLine}
-            onPages={onPages} onFitZoom={(z) => { fitRef.current = z; if (ui.zoom == null) setUi((u) => ({ ...u })); }} bus={bus} />
+            onPages={onPages} onFitZoom={onFitZoom} bus={bus} />
         </div>
       </div>
 

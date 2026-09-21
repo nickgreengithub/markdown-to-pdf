@@ -16,7 +16,8 @@ No build step, no backend, no accounts: everything stays in your browser.
   of a page. The caret's block is outlined and kept in view; clicking a block moves the
   caret to its source.
 - **Print = preview**: the PDF is made from the very sheets you see, so a page break in
-  the preview is a page break on paper. Optional page numbers.
+  the preview is a page break on paper. Running header and footer on every page, with
+  `{page}` and `{pages}`.
 - **Styling**: the left pane's THEME tab holds the theme picker and every control —
   page, each heading level, body text, lists, quote, code, table, rule, images, captions,
   links, footnotes, colours — all on one page, grouped like the block menu. Click an
@@ -42,7 +43,8 @@ CommonMark + GFM tables, strikethrough and task lists, plus:
 | `![alt](name "…"){width=50% align=right}` | Width and alignment — the style popover writes these for you |
 | `[^1]` … `[^1]: note` | Footnotes, collected at the end |
 
-The **Document ▾** menu loads a demo article that uses every element.
+**New document** offers a blank page, a demo article that uses every element, and a
+sample résumé with its own compact theme.
 
 ## Running locally
 

@@ -10,7 +10,8 @@
                    rendered here first so their heights can be read.
      ctx.pageH     sheet height in CSS px (297mm)
      ctx.padY      vertical page padding in CSS px
-     ctx.pageNumbers 'none' | 'bottom'
+     ctx.header    running header text, may use {page} and {pages}
+     ctx.footer    running footer text, same tokens
      ctx.token     () => boolean — false means a newer request superseded this one
 
    Rules:
@@ -109,6 +110,7 @@ window.Paginate = (() => {
   }
 
   /* ---- sheet construction ----------------------------------------------- */
+  const fillTokens = (tpl, page, pages) => String(tpl).replace(/\{page\}/g, page).replace(/\{pages\}/g, pages);
   function makeSheet(n, ctx) {
     const sheet = document.createElement('div');
     sheet.className = 'sheet';
@@ -120,12 +122,14 @@ window.Paginate = (() => {
     label.className = 'sheet-label';
     label.textContent = 'Page ' + n;
     sheet.appendChild(label);
-    if (ctx.pageNumbers && ctx.pageNumbers !== 'none') {
-      const pn = document.createElement('div');
-      pn.className = 'pnum';
-      pn.textContent = String(n);
-      sheet.appendChild(pn);
-    }
+    [['phead', ctx.header], ['pfoot', ctx.footer]].forEach(([cls, tpl]) => {
+      if (!tpl || !String(tpl).trim()) return;
+      const el = document.createElement('div');
+      el.className = cls;
+      el.dataset.tpl = String(tpl);
+      el.textContent = fillTokens(tpl, n, n);
+      sheet.appendChild(el);
+    });
     return sheet;
   }
 
@@ -232,11 +236,12 @@ window.Paginate = (() => {
       // a sheet left holding nothing (everything moved on) is dropped
       if (!doc.children.length && sheets.length > 1) { sheets[i].remove(); }
     }
-    // renumber
-    [...container.querySelectorAll(':scope > .sheet')].forEach((s, i) => {
+    // renumber, and fill the running header / footer now the page count is known
+    const all = [...container.querySelectorAll(':scope > .sheet')];
+    all.forEach((s, i) => {
       s.dataset.page = String(i + 1);
       const l = s.querySelector(':scope > .sheet-label'); if (l) l.textContent = 'Page ' + (i + 1);
-      const p = s.querySelector(':scope > .pnum'); if (p) p.textContent = String(i + 1);
+      s.querySelectorAll(':scope > .phead, :scope > .pfoot').forEach((el) => { el.textContent = fillTokens(el.dataset.tpl, i + 1, all.length); });
     });
     return moved;
   }

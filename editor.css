@@ -97,6 +97,8 @@ body.dragging * { cursor: col-resize !important; }
 .fmt.small.primary { background: var(--sel); color: #fff; border-color: var(--sel); }
 .fmt.small.primary:hover { background: #000; }
 .fmt.primary-fmt { background: var(--sel); color: #fff; height: 30px; padding: 0 12px; border-radius: 8px; }
+.fmt.pill { height: 30px; padding: 0 12px; border-radius: 8px; border-color: var(--edge); background: var(--panel); color: var(--text); font-size: 12.5px; font-weight: 600; }
+.fmt.pill:hover { background: var(--field); border-color: var(--text-3); }
 .fmt.primary-fmt:hover { background: #000; color: #fff; }
 .fmt-sep { width: 1px; height: 16px; background: var(--edge); margin: 0 3px; }
 
@@ -215,7 +217,12 @@ body.dragging * { cursor: col-resize !important; }
 .th-glabel { font-size: 9.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--text-3); padding: 0 2px 6px; }
 .th-section { background: var(--panel); border: 1px solid var(--edge); border-radius: 10px; padding: 6px 12px 8px; margin-bottom: 8px; transition: box-shadow .2s; scroll-margin-top: 10px; }
 .th-section.flash { box-shadow: 0 0 0 2px var(--hi); }
-.th-head { display: flex; align-items: center; gap: 9px; height: 30px; }
+.th-head { display: flex; align-items: center; gap: 9px; height: 30px; cursor: pointer; user-select: none; }
+.th-head:hover .th-label { color: var(--hi); }
+.th-chev { color: var(--text-3); font-size: 11px; width: 14px; text-align: center; }
+.th-section:not(.open) { padding-bottom: 6px; }
+.th-input { width: 100%; max-width: 230px; height: 28px; padding: 0 9px; border: 1px solid var(--edge); border-radius: 7px; background: var(--field); font: 500 12px/1 'Public Sans', system-ui, sans-serif; color: var(--text); outline: none; }
+.th-input:focus { border-color: var(--hi); background: var(--panel); }
 .th-ic { flex: 0 0 26px; width: 26px; height: 26px; display: inline-grid; place-items: center; border: 1px solid var(--edge); border-radius: 6px; background: var(--field); font: 600 10px/1 'Public Sans', system-ui, sans-serif; color: var(--text-2); }
 .th-label { flex: 1; font-size: 12.5px; font-weight: 700; }
 .th-reset { opacity: .55; }
@@ -282,6 +289,19 @@ body.dragging * { cursor: col-resize !important; }
 .tsel-font .tsel-btn > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tsel-font .tsel-pop { left: auto; right: 0; min-width: 196px; }
 .tsel-font .tsel-item { padding: 8px 9px; }
+
+/* ---------- New document dialog ---------- */
+.scrim { position: fixed; inset: 0; z-index: 80; background: rgba(41, 37, 36, .35); display: grid; place-items: center; }
+.dlg { width: min(640px, 92vw); background: var(--panel); border-radius: 14px; box-shadow: 0 24px 70px rgba(0,0,0,.3); overflow: hidden; }
+.dlg-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 12px 10px 18px; border-bottom: 1px solid var(--edge-soft); }
+.dlg-title { font-size: 14px; font-weight: 700; }
+.dlg-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 16px 18px; }
+.dlg-card { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 14px 14px 12px; border: 1px solid var(--edge); border-radius: 10px; background: var(--field); text-align: left; min-height: 96px; transition: border-color .1s, background .1s; }
+.dlg-card:hover { border-color: var(--hi); background: var(--panel); }
+.dlg-card-label { font-size: 13.5px; font-weight: 700; }
+.dlg-card-note { font-size: 11.5px; color: var(--text-2); line-height: 1.35; }
+.dlg-card-theme { margin-top: auto; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
+.dlg-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 18px 14px; font-size: 11px; color: var(--text-3); }
 
 /* toast */
 .toast { position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%) translateY(8px); background: var(--sel); color: #fff; padding: 7px 14px; border-radius: 8px; font-size: 12px; opacity: 0; pointer-events: none; transition: opacity .18s, transform .18s; z-index: 90; }

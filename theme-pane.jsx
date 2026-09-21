@@ -260,7 +260,8 @@ const SECTIONS = [
 ];
 const SECTION_OF = { 'inline-code': 'code', pagebreak: 'page', vspace: 'page' };
 
-function ThemePane({ themeId, applyTheme, vars, setVar, onReset, focus, caretImage, pageNumbers, setPageNumbers }) {
+function ThemePane({ themeId, applyTheme, vars, setVar, onReset, focus, caretImage, header, footer, setHeader, setFooter, open, setOpen }) {
+  const toggle = (id) => setOpen({ ...open, [id]: !open[id] });
   const scroll = useRefSP(null);
   const [flashId, setFlashId] = useStateSP(null);
   const cur = THEMES.find((t) => t.id === themeId) || THEMES[0];
@@ -270,7 +271,8 @@ function ThemePane({ themeId, applyTheme, vars, setVar, onReset, focus, caretIma
     const id = SECTION_OF[focus.kind] || focus.kind;
     const el = scroll.current && scroll.current.querySelector('#th-' + id);
     if (!el) return;
-    el.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    if (!open[id]) setOpen({ ...open, [id]: true });
+    requestAnimationFrame(() => el.scrollIntoView({ block: 'start', behavior: 'smooth' }));
     setFlashId(id);
     const t = setTimeout(() => setFlashId(null), 1400);
     return () => clearTimeout(t);
@@ -299,19 +301,24 @@ function ThemePane({ themeId, applyTheme, vars, setVar, onReset, focus, caretIma
         <div className="th-group" key={g.group}>
           <div className="th-glabel">{g.group}</div>
           {g.items.map((it) => (
-            <section className={'th-section' + (flashId === it.id ? ' flash' : '')} id={'th-' + it.id} key={it.id}>
-              <div className="th-head">
+            <section className={'th-section' + (flashId === it.id ? ' flash' : '') + (open[it.id] ? ' open' : '')} id={'th-' + it.id} key={it.id}>
+              <div className="th-head" onClick={() => toggle(it.id)} role="button" aria-expanded={!!open[it.id]}>
                 <span className="th-ic">{it.glyph}</span>
                 <span className="th-label">{it.label}</span>
-                {keysOf(it.id).length > 0 && <button className="fmt ico th-reset" title="Reset this section to the theme" onClick={() => onReset(keysOf(it.id))}><ResetIcon /></button>}
+                {open[it.id] && keysOf(it.id).length > 0 && <button className="fmt ico th-reset" title="Reset this section to the theme" onClick={(e) => { e.stopPropagation(); onReset(keysOf(it.id)); }}><ResetIcon /></button>}
+                <span className="th-chev">{open[it.id] ? '▾' : '▸'}</span>
               </div>
-              <Inspector target={it.id} vars={vars} setVar={setVar} />
-              {it.id === 'page' && (
-                <div className="insp">
-                  <div className="irow"><span className="ir-label"><RowIcon name="marker" /><span className="ir-lt">Page numbers</span></span><div className="ir-ctl"><Toggle on={pageNumbers !== 'none'} onChange={(o) => setPageNumbers(o ? 'bottom' : 'none')} /></div></div>
+              {open[it.id] && <Inspector target={it.id} vars={vars} setVar={setVar} />}
+              {open[it.id] && it.id === 'page' && (
+                <div className="th-sub">
+                  <div className="th-sublabel">Running header and footer on every page. <code>{'{page}'}</code> and <code>{'{pages}'}</code> become the numbers.</div>
+                  <div className="insp">
+                    <div className="irow"><span className="ir-label"><RowIcon name="spaceA" /><span className="ir-lt">Header</span></span><div className="ir-ctl"><input className="th-input" value={header || ''} placeholder="e.g. Quarterly report" onChange={(e) => setHeader(e.target.value)} /></div></div>
+                    <div className="irow"><span className="ir-label"><RowIcon name="spaceB" /><span className="ir-lt">Footer</span></span><div className="ir-ctl"><input className="th-input" value={footer || ''} placeholder="e.g. Page {page} of {pages}" onChange={(e) => setFooter(e.target.value)} /></div></div>
+                  </div>
                 </div>
               )}
-              {it.id === 'image' && (
+              {open[it.id] && it.id === 'image' && (
                 <div className="th-sub">
                   <div className="th-sublabel">{caretImage ? <>This image <code>{caretImage.name}</code></> : 'Put the caret on a line with an image to size it'}</div>
                   <Inspector target="thisimage" vars={vars} setVar={setVar} img={caretImage} />

@@ -46,10 +46,14 @@
   position: relative; box-sizing: border-box; height: 100%;
   padding: var(--pad-y) var(--pad-x); overflow: hidden;
 }
-.pnum {
-  position: absolute; left: 0; right: 0; bottom: calc(var(--pad-y) / 2 - 0.6em); text-align: center;
+/* running header and footer, in the page margins */
+.phead, .pfoot {
+  position: absolute; left: var(--pad-x); right: var(--pad-x); text-align: center;
   font: 500 0.78rem/1.2 var(--font-body); color: var(--muted); font-variant-numeric: tabular-nums;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+.phead { top: calc(var(--pad-y) / 2 - 0.6em); }
+.pfoot { bottom: calc(var(--pad-y) / 2 - 0.6em); }
 /* hidden, unzoomed measuring area: a sheet's .doc without the height cap */
 .measure-host { position: absolute; left: 0; top: 0; visibility: hidden; pointer-events: none; z-index: -1; zoom: 1; }
 .measure-host .sheet { height: auto; overflow: visible; box-shadow: none; }

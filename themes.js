@@ -66,6 +66,19 @@ window.THEMES = [
     },
   },
   {
+    id: 'resume', name: 'Résumé', note: 'Compact, one to two pages',
+    vars: {
+      'font-body': SANS, 'font-head': SANS, 'font-mono': MONO,
+      'fs-base': '11.5px', 'lh': '1.42', 'scale': '1.16', 'para': '0.45em',
+      'page-pad': '15mm', 'pad-x': '17mm', 'measure': 'none',
+      'head-weight': '700', 'head-tracking': '0.02em', 'head-transform': 'uppercase',
+      'h1-bar': '0', 'h2-bar': '1', 'h3-bar': '0', 'h3-case': 'none', 'h4-case': 'none', 'body-align': 'left',
+      'tbl-size': '1em', 'tbl-stripe': '0',
+      'ink': '#1c1f26', 'paper': '#ffffff', 'accent': '#1f4ed8',
+      'muted': '#5b6470', 'rule': '#d9dde3', 'code-bg': '#f3f4f6',
+    },
+  },
+  {
     id: 'compact', name: 'Compact', note: 'Dense, fits more',
     vars: {
       'font-body': FRANK, 'font-head': FRANK, 'font-mono': MONO,
@@ -138,7 +151,7 @@ window.expandTheme = function (v) {
     out[L + '-track'] = ht;
     out[L + '-space'] = spc[L];
     out[L + '-space-below'] = spcB[L];
-    out[L + '-case'] = hc;
+    out[L + '-case'] = v[L + '-case'] || hc;   // a theme may exempt a level from the heading case
     out[L + '-bar'] = v[L + '-bar'] || bars[L];
   });
   return out;

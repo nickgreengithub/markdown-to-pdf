@@ -1,4 +1,4 @@
-/* global React, ReactDOM, THEMES, expandTheme, Dialect, Library, DEMO, MarkdownPane, PreviewPane, ThemePane, HoverMenu, LogoMark, PrintIcon, SingleIcon, SpreadIcon, GridIcon, TurndownService, turndownPluginGfm */
+/* global React, ReactDOM, THEMES, expandTheme, Dialect, Library, DEMO, MarkdownPane, PreviewPane, ThemePane, LogoMark, PrintIcon, SingleIcon, SpreadIcon, GridIcon, TurndownService, turndownPluginGfm */
 /* ============================================================
    App — top bar, the two panes, persistence, print.
    Markdown text is the only source of truth; everything else derives.
@@ -51,13 +51,19 @@ function App() {
     const base = expandTheme(getTheme(get(LS.theme, get('mdv2.theme', t0.id))).vars);
     return persisted ? { ...base, ...persisted, paper: '#ffffff' } : base;
   });
-  const [ui, setUi] = useState(() => ({ mode: 'single', zoom: null, split: 0.42, pageNumbers: 'none', narrow: 'md', tab: 'md', ...getJSON(LS.ui, {}) }));
+  const [ui, setUi] = useState(() => {
+    const u = { mode: 'single', zoom: null, split: 0.42, narrow: 'md', tab: 'md', header: '', footer: '', thOpen: { page: true }, ...getJSON(LS.ui, {}) };
+    if (u.pageNumbers === 'bottom' && !u.footer) u.footer = '{page}'; // the previous page-numbers switch
+    delete u.pageNumbers;
+    return u;
+  });
   const [toast, setToast] = useState('');
   const [stats, setStats] = useState({ pages: 1, words: 0 });
   const [fitZoom, setFitZoom] = useState(1);
   const [currentLine, setCurrentLine] = useState(null);
   const [editorFocused, setEditorFocused] = useState(false);
   const [pageFocus, setPageFocus] = useState(null);   // { line, kind } of the block last clicked on the page
+  const [docDlg, setDocDlg] = useState(false);
   const [construct, setConstruct] = useState('');     // what is under the caret, for the pane header
   const bus = useRef({});
   const splitRef = useRef(null);
@@ -105,7 +111,7 @@ function App() {
       try { names.push(await Library.add(f)); } catch { flash('Could not read that image'); }
     }
     if (names.length && bus.current.md) {
-      bus.current.md.insert(names.map((n) => `![](${n})`).join('\n\n'), true);
+      bus.current.md.insert(names.map((n) => `![](${n}){width=50% align=left}`).join('\n\n'), true);
       flash(names.length === 1 ? `Added ${names[0]} to the library` : `Added ${names.length} images`);
     }
   }, [flash]);
@@ -177,6 +183,7 @@ function App() {
     if (!el) { el = document.createElement('style'); el.id = 'print-page-style'; document.head.appendChild(el); }
     el.textContent = '@page { size: A4; margin: 0; }';
     const onKey = (e) => {
+      if (e.key === 'Escape') setDocDlg(false);
       const mod = e.metaKey || e.ctrlKey;
       if (mod && e.key.toLowerCase() === 'p') { e.preventDefault(); printRef.current(); }
       if (e.altKey && !mod && /^[1-4]$/.test(e.key)) { const t = THEMES[+e.key - 1]; if (t) { e.preventDefault(); applyTheme(t); } }
@@ -195,14 +202,15 @@ function App() {
     window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
   };
 
-  const loadDemo = async () => {
-    if (md.trim() && md !== DEMO.md && !confirm('Replace the current document with the demo article?')) return;
-    await DEMO.seed(Library);
-    bus.current.md.setDoc(DEMO.md); setMd(DEMO.md); flash('Demo article loaded');
-  };
-  const startBlank = () => {
-    if (md.trim() && !confirm('Clear the document? (There is no undo for this.)')) return;
-    bus.current.md.setDoc(''); setMd(''); bus.current.md.focus();
+  const loadSample = async (sample) => {
+    const isSample = DEMO.SAMPLES.some((x) => x.md === md);
+    if (md.trim() && !isSample && !confirm('Replace the current document? There is no undo for this.')) return;
+    setDocDlg(false);
+    if (sample.id === 'demo') await DEMO.seed(Library);
+    bus.current.md.setDoc(sample.md); setMd(sample.md);
+    if (sample.theme) { const t = getTheme(sample.theme); setThemeId(t.id); setVars(expandTheme(t.vars)); }
+    setU({ tab: 'md' });
+    if (!sample.md) bus.current.md.focus(); else flash(sample.label + ' loaded');
   };
 
   const zoomShown = ui.zoom == null ? fitZoom : ui.zoom;
@@ -215,21 +223,8 @@ function App() {
     <div className={'app narrow-' + ui.narrow}>
       <header className="topbar">
         <div className="tb-left">
-          <span className="brand"><LogoMark /><span>Markdown Studio</span></span>
-          <HoverMenu className="tsel-menu" button={<span>Document</span>}>
-            {(close) => (
-              <div className="tsel-group">
-                <button className="tsel-item" onClick={() => { close(); loadDemo(); }}><span className="tsel-name">Load the demo article</span><span className="tsel-cur">every element</span></button>
-                <button className="tsel-item" onClick={() => { close(); startBlank(); }}><span className="tsel-name">Start blank</span></button>
-                {unusedImages.length > 0 && (
-                  <button className="tsel-item" onClick={() => { close(); if (confirm(`Delete ${unusedImages.length} image${unusedImages.length === 1 ? '' : 's'} the document no longer references?`)) unusedImages.forEach((i) => Library.remove(i.name)); }}>
-                    <span className="tsel-name">Remove unused images</span><span className="tsel-cur">{unusedImages.length}</span>
-                  </button>
-                )}
-                <div className="tsel-note">Everything is kept in this browser only — nothing is uploaded or saved elsewhere. Paste or drop an image anywhere to add it.</div>
-              </div>
-            )}
-          </HoverMenu>
+          <span className="brand" title="Markdown Studio"><LogoMark /></span>
+          <button className="fmt pill" onClick={() => setDocDlg(true)}>New document</button>
         </div>
         <div className="tb-right">
           <div className="seg modes">
@@ -264,7 +259,8 @@ function App() {
           </div>
           {ui.tab === 'theme' && (
             <ThemePane themeId={themeId} applyTheme={applyTheme} vars={vars} setVar={setVar} onReset={resetKeys}
-              focus={pageFocus} caretImage={caretImage} pageNumbers={ui.pageNumbers} setPageNumbers={(v) => setU({ pageNumbers: v })} />
+              focus={pageFocus} caretImage={caretImage} header={ui.header} footer={ui.footer} setHeader={(v) => setU({ header: v })} setFooter={(v) => setU({ footer: v })}
+              open={ui.thOpen || {}} setOpen={(o) => setU({ thOpen: o })} />
           )}
         </div>
         <div className="divider" onMouseDown={onDividerDown} title="Drag to resize" />
@@ -274,12 +270,32 @@ function App() {
             <span className="pane-note">A4 · {stats.pages} {stats.pages === 1 ? 'page' : 'pages'} · {stats.words} words</span>
             <span className="pane-hint">Click anything on the page to go to its source</span>
           </div>
-          <PreviewPane html={html} vars={pageVars} mode={ui.mode} zoom={ui.zoom} pageNumbers={ui.pageNumbers}
+          <PreviewPane html={html} vars={pageVars} mode={ui.mode} zoom={ui.zoom} header={ui.header} footer={ui.footer}
             currentLine={highlightLine} caretDriven={editorFocused} onBlockClick={onBlockClick} onEditStyle={onEditStyle} onScrollLine={onScrollLine}
             onPages={onPages} onFitZoom={onFitZoom} bus={bus} />
         </div>
       </div>
 
+      {docDlg && (
+        <div className="scrim" onMouseDown={(e) => { if (e.target === e.currentTarget) setDocDlg(false); }}>
+          <div className="dlg" role="dialog">
+            <div className="dlg-head"><span className="dlg-title">New document</span><button className="fmt ico" title="Close (Esc)" onClick={() => setDocDlg(false)}>✕</button></div>
+            <div className="dlg-cards">
+              {DEMO.SAMPLES.map((x) => (
+                <button className="dlg-card" key={x.id} onClick={() => loadSample(x)}>
+                  <span className="dlg-card-label">{x.label}</span>
+                  <span className="dlg-card-note">{x.note}</span>
+                  {x.theme && <span className="dlg-card-theme">{getTheme(x.theme).name} theme</span>}
+                </button>
+              ))}
+            </div>
+            <div className="dlg-foot">
+              <span>Everything stays in this browser — nothing is uploaded or saved elsewhere.</span>
+              {unusedImages.length > 0 && <button className="fmt small" onClick={() => { if (confirm(`Delete ${unusedImages.length} image${unusedImages.length === 1 ? '' : 's'} the document no longer references?`)) unusedImages.forEach((i) => Library.remove(i.name)); }}>Remove {unusedImages.length} unused image{unusedImages.length === 1 ? '' : 's'}</button>}
+            </div>
+          </div>
+        </div>
+      )}
       <div className={'toast' + (toast ? ' show' : '')}>{toast}</div>
     </div>
   );

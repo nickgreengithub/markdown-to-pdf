@@ -157,8 +157,6 @@ body.dragging * { cursor: col-resize !important; }
 /* directive lines */
 .cm-line-pagebreak { background: color-mix(in srgb, var(--md-mark) 9%, transparent); position: relative; }
 .cm-line-pagebreak::after { content: 'new page ↓'; position: absolute; right: 12px; top: 0; font: 600 9.5px/1.62em 'Public Sans', system-ui, sans-serif; letter-spacing: .06em; text-transform: uppercase; color: var(--md-mark); pointer-events: none; }
-.cm-line-vspace { background: color-mix(in srgb, var(--md-mark) 5%, transparent); }
-.cm-line-code { background: color-mix(in srgb, var(--md-code-bg) 55%, transparent); }
 /* tooltips */
 .cm-tooltip { background: var(--panel); border: 1px solid var(--edge); border-radius: 10px; box-shadow: 0 12px 34px rgba(0,0,0,.18); color: var(--text); font-family: 'Public Sans', system-ui, sans-serif; }
 .cm-tooltip-arrow::before { border-top-color: var(--edge) !important; border-bottom-color: var(--edge) !important; }

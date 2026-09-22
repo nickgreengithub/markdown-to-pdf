@@ -3,7 +3,7 @@
    Markdown pane — the only place the document is edited.
 
    CodeMirror 6 with:
-   - markdown syntax colouring (the raw marks stay raw)
+   - plain text: one face, one size, no colouring
    - "/" at the start of a line opens the block menu in the body:
      sectioned, scrollable, filtered as you type, Suggested on top
    - a "+" handle on the active line opens the same menu for that line
@@ -159,27 +159,8 @@ const libTick = CM.StateEffect.define();
 
 function buildExtensions({ onDocChange, onCaret, onImageFiles }) {
   const { EditorView, keymap, drawSelection, highlightActiveLine, highlightActiveLineGutter, Decoration, ViewPlugin, WidgetType, placeholder, gutter, GutterMarker,
-    defaultKeymap, history, historyKeymap, indentWithTab, markdown, markdownLanguage, syntaxHighlighting, HighlightStyle, autocompletion, completionKeymap, startCompletion,
+    defaultKeymap, history, historyKeymap, indentWithTab, markdown, markdownLanguage, autocompletion, completionKeymap, startCompletion,
     searchKeymap, highlightSelectionMatches, tags: t, Prec } = CM;
-
-  const style = HighlightStyle.define([
-    { tag: t.heading1, fontWeight: '700', fontSize: '1.25em', color: 'var(--md-head)' },
-    { tag: t.heading2, fontWeight: '700', fontSize: '1.15em', color: 'var(--md-head)' },
-    { tag: t.heading3, fontWeight: '700', fontSize: '1.05em', color: 'var(--md-head)' },
-    { tag: [t.heading4, t.heading5, t.heading6], fontWeight: '700', color: 'var(--md-head)' },
-    { tag: t.strong, fontWeight: '700' },
-    { tag: t.emphasis, fontStyle: 'italic' },
-    { tag: t.strikethrough, textDecoration: 'line-through', color: 'var(--md-muted)' },
-    { tag: t.monospace, color: 'var(--md-code)', background: 'var(--md-code-bg)', borderRadius: '3px' },
-    { tag: t.processingInstruction, color: 'var(--md-mark)', fontWeight: '600' },
-    { tag: t.url, color: 'var(--md-muted)', textDecoration: 'underline', textDecorationColor: 'var(--md-rule)' },
-    { tag: t.link, color: 'var(--md-link)' },
-    { tag: t.quote, color: 'var(--md-quote)', fontStyle: 'italic' },
-    { tag: t.contentSeparator, color: 'var(--md-mark)', fontWeight: '700' },
-    { tag: t.atom, color: 'var(--md-mark)' },
-    { tag: t.escape, color: 'var(--md-mark)' },
-    { tag: t.labelName, color: 'var(--md-mark)' },
-  ]);
 
   /* which lines are inside a fenced code block */
   let inFenceCache = { doc: null, lines: null };
@@ -195,7 +176,7 @@ function buildExtensions({ onDocChange, onCaret, onImageFiles }) {
     return set;
   };
 
-  /* line backgrounds: directives, code, and the hint on an empty active line */
+  /* the page-break line keeps a marker (it is a layout aid, not text formatting); the hint on an empty active line */
   const lineDeco = ViewPlugin.fromClass(class {
     constructor(view) { this.decorations = this.build(view); }
     update(u) { if (u.docChanged || u.viewportChanged || u.selectionSet || u.focusChanged) this.decorations = this.build(u.view); }
@@ -208,9 +189,8 @@ function buildExtensions({ onDocChange, onCaret, onImageFiles }) {
           const line = view.state.doc.lineAt(pos);
           if (!fences.has(line.number)) {
             if (/^\\pagebreak\s*$/.test(line.text)) b.add(line.from, line.from, Decoration.line({ class: 'cm-line-pagebreak' }));
-            else if (/^\\(vspace(\s+\d+)?)?\s*$/.test(line.text)) b.add(line.from, line.from, Decoration.line({ class: 'cm-line-vspace' }));
             else if (line.number === cur.number && !line.text && view.hasFocus && view.state.doc.length > 0) b.add(line.from, line.from, Decoration.line({ class: 'cm-line-hint' }));
-          } else if (!/^\s*(```|~~~)/.test(line.text)) b.add(line.from, line.from, Decoration.line({ class: 'cm-line-code' }));
+          }
           pos = line.to + 1;
         }
       }
@@ -379,7 +359,6 @@ function buildExtensions({ onDocChange, onCaret, onImageFiles }) {
   return [
     handleGutter, highlightActiveLineGutter(), highlightActiveLine(), drawSelection(), history(),
     markdown({ base: markdownLanguage, addKeymap: true }),
-    syntaxHighlighting(style),
     EditorView.lineWrapping,
     placeholder('Start writing, or type / for blocks. Paste an image anywhere.'),
     lineDeco, thumbs,

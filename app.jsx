@@ -52,7 +52,7 @@ function App() {
     return persisted ? { ...base, ...persisted, paper: '#ffffff' } : base;
   });
   const [ui, setUi] = useState(() => {
-    const u = { mode: 'single', zoom: null, split: 0.42, narrow: 'md', tab: 'md', header: '', footer: '', thOpen: { page: true }, ...getJSON(LS.ui, {}) };
+    const u = { mode: 'single', zoom: null, narrow: 'md', tab: 'md', header: '', footer: '', thOpen: { page: true }, ...getJSON(LS.ui, {}), split: 0.5 }; // always half and half on load
     if (u.pageNumbers === 'bottom' && !u.footer) u.footer = '{page}'; // the previous page-numbers switch
     delete u.pageNumbers;
     return u;

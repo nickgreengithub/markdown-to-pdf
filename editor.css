@@ -218,6 +218,16 @@ body.dragging * { cursor: col-resize !important; }
 .th-reset:hover { opacity: 1; }
 .th-section .insp { margin-top: 0; }
 .th-section .irow { min-height: 33px; grid-template-columns: 140px 1fr; }
+/* the Text section: level tabs down the left, that level's controls on the right */
+.th-levels { display: flex; gap: 10px; margin-top: 4px; }
+.th-vtabs { flex: 0 0 136px; display: flex; flex-direction: column; gap: 2px; padding-right: 10px; border-right: 1px solid var(--edge); }
+.th-vtab { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 6px; border: 0; border-radius: 7px; background: transparent; font-size: 12px; font-weight: 600; color: var(--text-2); text-align: left; white-space: nowrap; }
+.th-vtab:hover { background: var(--field); color: var(--text); }
+.th-vtab.on { background: var(--hi); color: #fff; }
+.th-vtab.on .th-ic { background: rgba(255,255,255,.2); border-color: transparent; color: #fff; }
+.th-vbody { flex: 1; min-width: 0; }
+.th-vhead { display: flex; align-items: center; justify-content: space-between; height: 28px; font-size: 12px; font-weight: 700; color: var(--text-2); }
+.th-vbody .irow { grid-template-columns: 112px 1fr; }
 .th-sub { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--edge); }
 .th-sublabel { font-size: 11px; color: var(--text-2); padding: 2px 0 4px; }
 .th-sublabel code, .th-foot code { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; background: var(--field); padding: 0 4px; border-radius: 3px; }

@@ -11,7 +11,9 @@
    ============================================================ */
 const { useState: useStatePV, useEffect: useEffectPV, useRef: useRefPV, useLayoutEffect: useLayoutEffectPV } = React;
 
-const A4_W_PX = 793.7, A4_H_PX = 1122.5; // 210 × 297 mm at 96 dpi
+const MM = 96 / 25.4;
+const PAGE_MM_PV = { A4: [210, 297], Letter: [215.9, 279.4] };
+const pageDims = (page) => { const d = PAGE_MM_PV[(page && page.size) || 'A4'] || PAGE_MM_PV.A4; return page && page.orient === 'landscape' ? [d[1], d[0]] : d; };
 const COLS = { single: 1, spread: 2, grid: 3 };
 
 /* what a clicked element is, for the style popover */
@@ -42,7 +44,7 @@ function targetOf(el) {
 
 const PENCIL = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
 
-function PreviewPane({ html, vars, mode, zoom, header, footer, currentLine, caretDriven, onBlockClick, onEditStyle, onScrollLine, onPages, onFitZoom, bus, dim }) {
+function PreviewPane({ html, vars, mode, zoom, header, footer, page, currentLine, caretDriven, onBlockClick, onEditStyle, onScrollLine, onPages, onFitZoom, bus, dim }) {
   const scrollRef = useRefPV(null);
   const sheetsRef = useRefPV(null);
   const measureRef = useRefPV(null);
@@ -61,6 +63,8 @@ function PreviewPane({ html, vars, mode, zoom, header, footer, currentLine, care
     return () => document.fonts.removeEventListener('loadingdone', on);
   }, []);
 
+  const [pwMm, phMm] = pageDims(page);
+  const pageWpx = pwMm * MM, pageHpx = phMm * MM;
   // fit zoom: N sheets across the available width
   useLayoutEffectPV(() => {
     const el = scrollRef.current; if (!el) return;
@@ -68,14 +72,14 @@ function PreviewPane({ html, vars, mode, zoom, header, footer, currentLine, care
       const cols = COLS[mode] || 1;
       const pad = 36, gap = 28;
       const w = el.clientWidth - pad * 2 - gap * (cols - 1);
-      const z = Math.max(0.15, Math.min(2, w / (cols * A4_W_PX)));
+      const z = Math.max(0.15, Math.min(2, w / (cols * pageWpx)));
       setFit(z);
       if (onFitZoom) onFitZoom(z);
     };
     calc();
     const ro = new ResizeObserver(calc); ro.observe(el);
     return () => ro.disconnect();
-  }, [mode]);
+  }, [mode, pageWpx]);
 
   // paginate whenever the document or its styling changes
   useEffectPV(() => {
@@ -90,11 +94,12 @@ function PreviewPane({ html, vars, mode, zoom, header, footer, currentLine, care
         await document.fonts.ready;
         if (!token()) return;
         const padY = parseFloat(getComputedStyle(measure).paddingTop) || 0;
-        const res = await Paginate.paginate(html, { measure, pageH: A4_H_PX, padY, header, footer, token });
+        const furniture = { header, footer, firstPlain: !!(page && page.firstPlain) };
+        const res = await Paginate.paginate(html, { measure, pageH: pageHpx, padY, ...furniture, token });
         if (!res || !token() || cancelled) return;
         const keepScroll = scrollRef.current ? scrollRef.current.scrollTop : 0;
         sheets.replaceChildren(...res.sheets);
-        Paginate.verify(sheets, { header, footer });
+        Paginate.verify(sheets, furniture);
         if (scrollRef.current) scrollRef.current.scrollTop = keepScroll;
         setOverflow(res.overflow);
         const n = sheets.querySelectorAll(':scope > .sheet').length;
@@ -104,7 +109,7 @@ function PreviewPane({ html, vars, mode, zoom, header, footer, currentLine, care
       } finally { if (token()) setBusy(false); }
     }, 25); // pagination is ~15ms for a 7-page document, so a short trailing debounce is enough
     return () => { cancelled = true; clearTimeout(t); };
-  }, [html, vars, header, footer, fontTick]);
+  }, [html, vars, header, footer, page, fontTick]);
 
   // current-block highlight from the editor caret
   const currentLineRef = useRefPV(currentLine);
@@ -199,7 +204,7 @@ function PreviewPane({ html, vars, mode, zoom, header, footer, currentLine, care
 
   const z = zoom == null ? fit : zoom;
   return (
-    <div className={'preview' + (dim ? ' dim' : '')} ref={rootRef} style={vars}
+    <div className={'preview' + (dim ? ' dim' : '')} ref={rootRef} style={{ ...vars, '--page-w': pwMm + 'mm', '--page-h': phMm + 'mm' }}
       onMouseEnter={() => { hoverRef.current = true; }} onMouseLeave={() => { hoverRef.current = false; }}>
       <div className="preview-scroll" ref={scrollRef} onScroll={onScroll} onClick={onClick}>
         <div className="sheets-zoom" style={{ zoom: z }}>

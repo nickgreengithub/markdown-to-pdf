@@ -142,6 +142,7 @@ window.expandTheme = function (v) {
     'code-size': v['code-size'] || '0.85em', 'code-border': v['code-border'] || '1',
     'cap-size': v['cap-size'] || '0.85em', 'cap-color': v['cap-color'] || v['muted'], 'cap-style': v['cap-style'] || 'normal', 'cap-align': v['cap-align'] || 'center',
     'fn-size': v['fn-size'] || '0.82em', 'fn-color': v['fn-color'] || v['muted'],
+    'body-hyphens': v['body-hyphens'] || 'auto',
   };
   ['h1', 'h2', 'h3', 'h4'].forEach((L) => {
     out[L + '-font'] = v['font-head'];

@@ -10,8 +10,9 @@
                    rendered here first so their heights can be read.
      ctx.pageH     sheet height in CSS px (297mm)
      ctx.padY      vertical page padding in CSS px
-     ctx.header    running header text, may use {page} and {pages}
-     ctx.footer    running footer text, same tokens
+     ctx.header    running header: { l, c, r } texts (a string means centre); {page} and {pages}
+     ctx.footer    running footer, same shape
+     ctx.firstPlain no header or footer on the first page
      ctx.token     () => boolean — false means a newer request superseded this one
 
    Rules:
@@ -122,14 +123,22 @@ window.Paginate = (() => {
     label.className = 'sheet-label';
     label.textContent = 'Page ' + n;
     sheet.appendChild(label);
-    [['phead', ctx.header], ['pfoot', ctx.footer]].forEach(([cls, tpl]) => {
-      if (!tpl || !String(tpl).trim()) return;
-      const el = document.createElement('div');
-      el.className = cls;
-      el.dataset.tpl = String(tpl);
-      el.textContent = fillTokens(tpl, n, n);
-      sheet.appendChild(el);
-    });
+    if (!(ctx.firstPlain && n === 1)) {
+      [['phead', ctx.header], ['pfoot', ctx.footer]].forEach(([cls, spec]) => {
+        const parts = typeof spec === 'string' ? { c: spec } : (spec || {});
+        if (!['l', 'c', 'r'].some((k) => parts[k] && String(parts[k]).trim())) return;
+        const el = document.createElement('div');
+        el.className = cls;
+        ['l', 'c', 'r'].forEach((k) => {
+          const span = document.createElement('span');
+          span.className = 'p' + k;
+          span.dataset.tpl = parts[k] ? String(parts[k]) : '';
+          span.textContent = fillTokens(span.dataset.tpl, n, n);
+          el.appendChild(span);
+        });
+        sheet.appendChild(el);
+      });
+    }
     return sheet;
   }
 
@@ -241,7 +250,7 @@ window.Paginate = (() => {
     all.forEach((s, i) => {
       s.dataset.page = String(i + 1);
       const l = s.querySelector(':scope > .sheet-label'); if (l) l.textContent = 'Page ' + (i + 1);
-      s.querySelectorAll(':scope > .phead, :scope > .pfoot').forEach((el) => { el.textContent = fillTokens(el.dataset.tpl, i + 1, all.length); });
+      s.querySelectorAll(':scope > .phead > span, :scope > .pfoot > span').forEach((el) => { el.textContent = fillTokens(el.dataset.tpl, i + 1, all.length); });
     });
     return moved;
   }

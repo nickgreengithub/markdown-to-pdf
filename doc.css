@@ -24,11 +24,11 @@
 }
 
 /* ---- the sheets ---------------------------------------------------------- */
-.sheets { display: grid; grid-template-columns: 210mm; gap: 28px; justify-content: center; padding: 36px; }
-.sheets.mode-spread { grid-template-columns: repeat(2, 210mm); }
-.sheets.mode-grid   { grid-template-columns: repeat(3, 210mm); }
+.sheets { display: grid; grid-template-columns: var(--page-w, 210mm); gap: 28px; justify-content: center; padding: 36px; }
+.sheets.mode-spread { grid-template-columns: repeat(2, var(--page-w, 210mm)); }
+.sheets.mode-grid   { grid-template-columns: repeat(3, var(--page-w, 210mm)); }
 .sheet {
-  position: relative; width: 210mm; height: 297mm; box-sizing: border-box;
+  position: relative; width: var(--page-w, 210mm); height: var(--page-h, 297mm); box-sizing: border-box;
   background: var(--paper); color: var(--ink);
   box-shadow: 0 1px 2px rgba(0,0,0,.12), 0 12px 36px rgba(0,0,0,.22);
   border-radius: 2px; overflow: visible; /* the .doc inside clips; the label sits above the sheet */
@@ -48,10 +48,11 @@
 }
 /* running header and footer, in the page margins */
 .phead, .pfoot {
-  position: absolute; left: var(--pad-x); right: var(--pad-x); text-align: center;
-  font: 500 0.78rem/1.2 var(--font-body); color: var(--muted); font-variant-numeric: tabular-nums;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  position: absolute; left: var(--pad-x); right: var(--pad-x); display: grid; grid-template-columns: 1fr auto 1fr; gap: 1em;
+  font: 500 0.78rem/1.2 var(--font-body); color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap;
 }
+.phead > span, .pfoot > span { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.phead > .pl, .pfoot > .pl { text-align: left; } .phead > .pc, .pfoot > .pc { text-align: center; } .phead > .pr, .pfoot > .pr { text-align: right; }
 .phead { top: calc(var(--pad-y) / 2 - 0.6em); }
 .pfoot { bottom: calc(var(--pad-y) / 2 - 0.6em); }
 /* hidden, unzoomed measuring area: a sheet's .doc without the height cap */
@@ -120,7 +121,7 @@
 
 .doc ul, .doc ol, .doc blockquote, .doc pre, .doc table, .doc dl, .doc figure { margin: 0 0 var(--para); }
 .doc p {
-  text-align: var(--body-align, justify); hyphens: auto; margin: var(--para-above, 0em) 0 var(--para);
+  text-align: var(--body-align, justify); hyphens: var(--body-hyphens, auto); margin: var(--para-above, 0em) 0 var(--para);
   padding-bottom: calc(var(--body-bar, 0) * 0.25em); border-bottom: calc(var(--body-bar, 0) * 1px) solid var(--rule);
 }
 .doc a { color: var(--link-color, var(--accent)); text-decoration-line: var(--link-deco, none); text-decoration-thickness: 1px; text-underline-offset: 2px; }
@@ -223,7 +224,7 @@
   #print-root { display: block; }
   #print-root .sheets { display: block; padding: 0; }
   #print-root .sheet {
-    width: 210mm; height: 297mm; margin: 0; box-shadow: none; border-radius: 0; overflow: hidden;
+    width: var(--page-w, 210mm); height: var(--page-h, 297mm); margin: 0; box-shadow: none; border-radius: 0; overflow: hidden;
     break-after: page; page-break-after: always;
   }
   #print-root .sheet:last-child { break-after: auto; page-break-after: auto; }

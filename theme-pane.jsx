@@ -46,7 +46,14 @@ function RowStep({ value, unit, step, min, max, disabled, onChange }) {
     </div>
   );
 }
-/* a hover/click dropdown shell used by the font, theme and target menus */
+function Seg({ value, options, onChange, style }) {
+  return (
+    <div className="ir-seg">
+      {options.map(([v, label, st]) => <button key={v} className={'ir-seg-b' + (value === v ? ' on' : '')} style={st} onClick={() => onChange(v)}>{label}</button>)}
+    </div>
+  );
+}
+/* a hover/click dropdown shell used by the font menu */
 function HoverMenu({ button, children, className, disabled, align }) {
   const [open, setOpen] = useStateSP(false);
   const ref = useRefSP(null);
@@ -170,11 +177,16 @@ function rowsFor(target) {
       { label: 'Align', icon: 'align', type: 'imgalign' },
     ];
     case 'page': return [
-      { label: 'Margin top/bottom', icon: 'padY', type: 'step', v: 'pad-y', unit: 'mm', step: 1, min: 5, max: 45 },
-      { label: 'Margin sides', icon: 'padX', type: 'step', v: 'pad-x', unit: 'mm', step: 1, min: 5, max: 45 },
+      { label: 'Top & bottom', icon: 'padY', type: 'step', v: 'pad-y', unit: 'mm', step: 1, min: 5, max: 45 },
+      { label: 'Sides', icon: 'padX', type: 'step', v: 'pad-x', unit: 'mm', step: 1, min: 5, max: 45 },
+    ];
+    case 'global': return [
+      { label: 'Heading font', icon: 'font', type: 'headfont' },
+      { label: 'Body font', icon: 'font', type: 'font', v: 'font-body' },
       { label: 'Base size', icon: 'size', type: 'step', v: 'fs-base', unit: 'px', step: 0.5, min: 9, max: 24 },
       { label: 'Line height', icon: 'lh', type: 'step', v: 'lh', step: 0.02, min: 1, max: 2.4 },
       { label: 'Paragraph gap', icon: 'spaceB', type: 'step', v: 'para', unit: 'em', step: 0.05, min: 0, max: 2.5 },
+      { label: 'Hyphenate', icon: 'letter', type: 'toggle', v: 'body-hyphens', on: 'auto', off: 'manual' },
     ];
     case 'colours': return [
       { label: 'Text', icon: 'color', type: 'color', v: 'ink', opts: 'ink' },
@@ -187,7 +199,7 @@ function rowsFor(target) {
   }
 }
 /* the theme-variable keys a target owns (for "reset to theme") */
-const keysOf = (target) => rowsFor(target).map((r) => r.v).filter(Boolean);
+const keysOf = (target) => rowsFor(target).map((r) => r.v).filter(Boolean).concat(target === 'global' ? ['h1-font', 'h2-font', 'h3-font', 'h4-font'] : []);
 
 function RowControl({ row, vars, setVar, img }) {
   const v = row.v;
@@ -216,6 +228,7 @@ function RowControl({ row, vars, setVar, img }) {
     );
   }
   if (row.type === 'font') return <FontMenu value={val || ''} onChange={(stack) => setVar(v, stack)} />;
+  if (row.type === 'headfont') return <FontMenu value={vars['h1-font'] || ''} onChange={(stack) => ['h1', 'h2', 'h3', 'h4'].forEach((l) => setVar(l + '-font', stack))} />;
   if (row.type === 'step') return <RowStep value={val} unit={row.unit} step={row.step} min={row.min} max={row.max} onChange={(nv) => setVar(v, nv)} />;
   if (row.type === 'case') {
     const cs = val || 'none';
@@ -257,6 +270,7 @@ const SECTIONS = [
 const SECTION_OF = { 'inline-code': 'code', pagebreak: 'page', vspace: 'page', h1: 'text', h2: 'text', h3: 'text', h4: 'text', p: 'text' };
 /* the levels inside the Text section: vertical tabs on the left, one level's controls on the right */
 const LEVELS_UI = [
+  { id: 'global', label: 'All text', glyph: '∀' },
   { id: 'h1', label: 'Heading 1', glyph: 'H1' }, { id: 'h2', label: 'Heading 2', glyph: 'H2' },
   { id: 'h3', label: 'Heading 3', glyph: 'H3' }, { id: 'h4', label: 'Heading 4', glyph: 'H4' },
   { id: 'p', label: 'Body', glyph: 'Aa' },
@@ -280,9 +294,8 @@ function TextLevels({ level, setLevel, vars, setVar, onReset }) {
   );
 }
 
-function ThemePane({ themeId, applyTheme, vars, setVar, onReset, focus, caretImage, header, footer, setHeader, setFooter, open, setOpen }) {
-  const toggle = (id) => setOpen({ ...open, [id]: !open[id] });
-  const [level, setLevel] = useStateSP('h1');
+function ThemePane({ themeId, applyTheme, vars, setVar, onReset, focus, caretImage, header, footer, setHeader, setFooter, page, setPage }) {
+  const [level, setLevel] = useStateSP('global');
   const scroll = useRefSP(null);
   const [flashId, setFlashId] = useStateSP(null);
   const cur = THEMES.find((t) => t.id === themeId) || THEMES[0];
@@ -293,7 +306,6 @@ function ThemePane({ themeId, applyTheme, vars, setVar, onReset, focus, caretIma
     if (id === 'text' && LEVELS_UI.some((l) => l.id === focus.kind)) setLevel(focus.kind);
     const el = scroll.current && scroll.current.querySelector('#th-' + id);
     if (!el) return;
-    if (!open[id]) setOpen({ ...open, [id]: true });
     requestAnimationFrame(() => el.scrollIntoView({ block: 'start', behavior: 'smooth' }));
     setFlashId(id);
     const t = setTimeout(() => setFlashId(null), 1400);
@@ -304,46 +316,46 @@ function ThemePane({ themeId, applyTheme, vars, setVar, onReset, focus, caretIma
   return (
     <div className="themepane" ref={scroll}>
       <div className="th-top">
-        <HoverMenu className="tsel-theme" button={<span><span className="tsel-aa" style={{ background: cur.vars.paper, color: cur.vars.ink, fontFamily: cur.vars['font-head'] }}>Aa</span><span className="th-name">{cur.name}</span><span className="th-note">{cur.note}</span></span>}>
-          {(close) => (
-            <div className="tsel-group">
-              {THEMES.map((t) => (
-                <button key={t.id} className={'tsel-item' + (t.id === themeId ? ' sel' : '')} onClick={() => { applyTheme(t); close(); }}>
-                  <span className="tsel-aa" style={{ background: t.vars.paper, color: t.vars.ink, fontFamily: t.vars['font-head'] }}>Aa</span>
-                  <span className="tsel-name">{t.name}<span className="tsel-note-inl">{t.note}</span></span>
-                  {t.id === themeId && <span className="tsel-cur">current</span>}
-                </button>
-              ))}
-              <div className="tsel-note">Applying a theme resets every control below to that theme.</div>
-            </div>
-          )}
-        </HoverMenu>
+        <div className="th-themes">
+          {THEMES.map((t) => (
+            <button key={t.id} className={'th-theme' + (t.id === themeId ? ' on' : '')} style={{ fontFamily: t.vars['font-head'] }} title={t.note} onClick={() => applyTheme(t)}>{t.name}</button>
+          ))}
+        </div>
         <button className="fmt small" title="Put every control back to the theme's values" onClick={() => onReset(allKeys)}><ResetIcon /> Reset all</button>
       </div>
       {SECTIONS.map((g) => (
         <div className="th-group" key={g.group}>
           <div className="th-glabel">{g.group}</div>
           {g.items.map((it) => (
-            <section className={'th-section' + (flashId === it.id ? ' flash' : '') + (open[it.id] ? ' open' : '')} id={'th-' + it.id} key={it.id}>
-              <div className="th-head" onClick={() => toggle(it.id)} role="button" aria-expanded={!!open[it.id]}>
-                <span className="th-ic">{it.glyph}</span>
+            <section className={'th-section' + (flashId === it.id ? ' flash' : '')} id={'th-' + it.id} key={it.id}>
+              <div className="th-head">
                 <span className="th-label">{it.label}</span>
-                {open[it.id] && keysFor(it.id).length > 0 && <button className="fmt ico th-reset" title="Reset this section to the theme" onClick={(e) => { e.stopPropagation(); onReset(keysFor(it.id)); }}><ResetIcon /></button>}
-                <span className="th-chev">{open[it.id] ? '▾' : '▸'}</span>
+                {keysFor(it.id).length > 0 && <button className="fmt ico th-reset" title="Reset this section to the theme" onClick={() => onReset(keysFor(it.id))}><ResetIcon /></button>}
               </div>
-              {open[it.id] && (it.id === 'text'
+              {it.id === 'page' && (
+                <div className="insp">
+                  <div className="irow"><span className="ir-label"><RowIcon name="width" /><span className="ir-lt">Paper</span></span><div className="ir-ctl"><Seg value={page.size} options={[['A4', 'A4'], ['Letter', 'US Letter']]} onChange={(v) => setPage({ ...page, size: v })} /></div></div>
+                  <div className="irow"><span className="ir-label"><RowIcon name="align" /><span className="ir-lt">Orientation</span></span><div className="ir-ctl"><Seg value={page.orient} options={[['portrait', 'Portrait'], ['landscape', 'Landscape']]} onChange={(v) => setPage({ ...page, orient: v })} /></div></div>
+                </div>
+              )}
+              {it.id === 'text'
                 ? <TextLevels level={level} setLevel={setLevel} vars={vars} setVar={setVar} onReset={onReset} />
-                : <Inspector target={it.id} vars={vars} setVar={setVar} />)}
-              {open[it.id] && it.id === 'page' && (
+                : <Inspector target={it.id} vars={vars} setVar={setVar} />}
+              {it.id === 'page' && (
                 <div className="th-sub">
-                  <div className="th-sublabel">Running header and footer on every page. <code>{'{page}'}</code> and <code>{'{pages}'}</code> become the numbers.</div>
+                  <div className="th-sublabel">Header and footer, left · centre · right. <code>{'{page}'}</code> and <code>{'{pages}'}</code> become the numbers.</div>
+                  {[['Header', header, setHeader, 'spaceA'], ['Footer', footer, setFooter, 'spaceB']].map(([label, val, set, icon]) => (
+                    <div className="th-hf" key={label}>
+                      <span className="ir-label"><RowIcon name={icon} /><span className="ir-lt">{label}</span></span>
+                      {['l', 'c', 'r'].map((k) => <input key={k} className="th-input th-hf-in" value={(val && val[k]) || ''} placeholder={{ l: 'left', c: 'centre', r: 'right' }[k]} onChange={(e) => set({ ...(val || {}), [k]: e.target.value })} />)}
+                    </div>
+                  ))}
                   <div className="insp">
-                    <div className="irow"><span className="ir-label"><RowIcon name="spaceA" /><span className="ir-lt">Header</span></span><div className="ir-ctl"><input className="th-input" value={header || ''} placeholder="e.g. Quarterly report" onChange={(e) => setHeader(e.target.value)} /></div></div>
-                    <div className="irow"><span className="ir-label"><RowIcon name="spaceB" /><span className="ir-lt">Footer</span></span><div className="ir-ctl"><input className="th-input" value={footer || ''} placeholder="e.g. Page {page} of {pages}" onChange={(e) => setFooter(e.target.value)} /></div></div>
+                    <div className="irow"><span className="ir-label"><RowIcon name="marker" /><span className="ir-lt">Plain first page</span></span><div className="ir-ctl"><Toggle on={!!page.firstPlain} onChange={(o) => setPage({ ...page, firstPlain: o })} /></div></div>
                   </div>
                 </div>
               )}
-              {open[it.id] && it.id === 'image' && (
+              {it.id === 'image' && (
                 <div className="th-sub">
                   <div className="th-sublabel">{caretImage ? <>This image <code>{caretImage.name}</code></> : 'Put the caret on a line with an image to size it'}</div>
                   <Inspector target="thisimage" vars={vars} setVar={setVar} img={caretImage} />

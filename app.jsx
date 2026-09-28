@@ -11,6 +11,7 @@ const getJSON = (k, f) => { try { const v = localStorage.getItem(k); return v ==
 const set = (k, v) => { try { localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v)); return true; } catch { return false; } };
 const getTheme = (id) => THEMES.find((t) => t.id === id) || THEMES[0];
 const isMac = navigator.platform.includes('Mac');
+const PAGE_MM = { A4: [210, 297], Letter: [215.9, 279.4] };
 
 /* ---- one-time migration from the previous (HTML-first) version ---- */
 async function migrateLegacy() {
@@ -52,9 +53,11 @@ function App() {
     return persisted ? { ...base, ...persisted, paper: '#ffffff' } : base;
   });
   const [ui, setUi] = useState(() => {
-    const u = { mode: 'single', zoom: null, narrow: 'md', tab: 'md', header: '', footer: '', thOpen: { page: true }, ...getJSON(LS.ui, {}), split: 0.5 }; // always half and half on load
+    const u = { mode: 'single', zoom: null, narrow: 'md', tab: 'md', header: {}, footer: {}, page: { size: 'A4', orient: 'portrait', firstPlain: false }, ...getJSON(LS.ui, {}), split: 0.5 }; // always half and half on load
     if (u.pageNumbers === 'bottom' && !u.footer) u.footer = '{page}'; // the previous page-numbers switch
-    delete u.pageNumbers;
+    if (typeof u.header === 'string') u.header = u.header ? { c: u.header } : {};   // earlier single-field form → centre
+    if (typeof u.footer === 'string') u.footer = u.footer ? { c: u.footer } : {};
+    delete u.pageNumbers; delete u.thOpen;
     return u;
   });
   const [toast, setToast] = useState('');
@@ -169,6 +172,10 @@ function App() {
     const old = document.getElementById('print-root'); if (old) old.remove();
     const pr = document.createElement('div'); pr.id = 'print-root';
     Object.keys(vars).forEach((k) => pr.style.setProperty('--' + k, vars[k]));
+    const dims = PAGE_MM[ui.page.size] || PAGE_MM.A4;
+    const [pw, ph] = ui.page.orient === 'landscape' ? [dims[1], dims[0]] : dims;
+    pr.style.setProperty('--page-w', pw + 'mm'); pr.style.setProperty('--page-h', ph + 'mm');
+    const ps = document.getElementById('print-page-style'); if (ps) ps.textContent = `@page { size: ${ui.page.size === 'Letter' ? 'letter' : 'A4'} ${ui.page.orient}; margin: 0; }`;
     clone.querySelectorAll('.is-current').forEach((n) => n.classList.remove('is-current'));
     clone.querySelectorAll('.cur-tag').forEach((n) => n.remove());
     pr.appendChild(clone);
@@ -260,7 +267,7 @@ function App() {
           {ui.tab === 'theme' && (
             <ThemePane themeId={themeId} applyTheme={applyTheme} vars={vars} setVar={setVar} onReset={resetKeys}
               focus={pageFocus} caretImage={caretImage} header={ui.header} footer={ui.footer} setHeader={(v) => setU({ header: v })} setFooter={(v) => setU({ footer: v })}
-              open={ui.thOpen || {}} setOpen={(o) => setU({ thOpen: o })} />
+              page={ui.page} setPage={(v) => setU({ page: v })} />
           )}
         </div>
         <div className="divider" onMouseDown={onDividerDown} title="Drag to resize" />
@@ -270,7 +277,7 @@ function App() {
             <span className="pane-note">A4 · {stats.pages} {stats.pages === 1 ? 'page' : 'pages'} · {stats.words} words</span>
             <span className="pane-hint">Click anything on the page to go to its source</span>
           </div>
-          <PreviewPane html={html} vars={pageVars} mode={ui.mode} zoom={ui.zoom} header={ui.header} footer={ui.footer}
+          <PreviewPane html={html} vars={pageVars} mode={ui.mode} zoom={ui.zoom} header={ui.header} footer={ui.footer} page={ui.page}
             currentLine={highlightLine} caretDriven={editorFocused} onBlockClick={onBlockClick} onEditStyle={onEditStyle} onScrollLine={onScrollLine}
             onPages={onPages} onFitZoom={onFitZoom} bus={bus} />
         </div>

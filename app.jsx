@@ -97,9 +97,9 @@ function App() {
   const [html, setHtml] = useState('');
   useEffect(() => {
     if (!ready) return;
-    const t = setTimeout(() => setHtml(dialect.render(md)), 20); // render is a few ms; keep the preview close behind the caret
+    const t = setTimeout(() => setHtml(dialect.render(md, { numbering: vars['head-num'] })), 20); // render is a few ms; keep the preview close behind the caret
     return () => clearTimeout(t);
-  }, [md, libTick, ready]);
+  }, [md, libTick, ready, vars['head-num']]);
   const usedImages = useMemo(() => new Set(dialect.images(md).map((i) => i.name)), [md]);
   const unusedImages = useMemo(() => Library.list().filter((i) => !usedImages.has(i.name)), [usedImages, libTick]);
 

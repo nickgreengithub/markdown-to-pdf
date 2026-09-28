@@ -12,6 +12,7 @@ const COLOR_SETS = {
   muted:  ['#6b7280', '#7d7368', '#9a9a9a', '#5b6470', '#8a8f98', '#a89f92'],
   rule:   ['#e6e8ec', '#eae3da', '#e1e6ea', '#dfe2e5', '#d8dde3', '#cdd3da'],
   codebg: ['#f4f5f8', '#f4f0e7', '#f4f7f9', '#f7f7f7', '#eef1f5', '#f0ece4'],
+  head:   ['#1b1d22', '#1d4ed8', '#0e7490', '#6d28d9', '#b8402a', '#5b2a4e'],
 };
 const CASES = ['none', 'uppercase', 'capitalize'];
 const CASE_GLYPH = { none: 'Aa', uppercase: 'AG', capitalize: 'Ab' };
@@ -53,15 +54,11 @@ function Seg({ value, options, onChange, style }) {
     </div>
   );
 }
-/* a hover/click dropdown shell used by the font menu */
+/* a click dropdown shell used by the font menu. Click only: opening on
+   hover made the click that followed (or a tap) close it straight away. */
 function HoverMenu({ button, children, className, disabled, align }) {
   const [open, setOpen] = useStateSP(false);
   const ref = useRefSP(null);
-  const closeT = useRefSP(null);
-  const cancelClose = () => { if (closeT.current) { clearTimeout(closeT.current); closeT.current = null; } };
-  const openNow = () => { if (disabled) return; cancelClose(); setOpen(true); };
-  const closeSoon = () => { cancelClose(); closeT.current = setTimeout(() => setOpen(false), 200); };
-  useEffectSP(() => () => cancelClose(), []);
   useEffectSP(() => {
     if (!open) return;
     const onDown = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
@@ -71,8 +68,8 @@ function HoverMenu({ button, children, className, disabled, align }) {
     return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
   }, [open]);
   return (
-    <div className={'tsel ' + (className || '') + (disabled ? ' is-disabled' : '')} ref={ref} onMouseEnter={openNow} onMouseLeave={closeSoon}>
-      <button className={'tsel-btn' + (open ? ' open' : '')} disabled={disabled} onClick={() => (open ? setOpen(false) : openNow())}>
+    <div className={'tsel ' + (className || '') + (disabled ? ' is-disabled' : '')} ref={ref}>
+      <button className={'tsel-btn' + (open ? ' open' : '')} disabled={disabled} onClick={() => setOpen(!open && !disabled)}>
         {button}<span className="tsel-chev">▾</span>
       </button>
       {open && <div className={'tsel-pop' + (align === 'right' ? ' right' : '')}>{typeof children === 'function' ? children(() => setOpen(false)) : children}</div>}
@@ -97,17 +94,37 @@ function FontMenu({ value, onChange, disabled }) {
   );
 }
 
+/* a "?" that explains the header / footer boxes on hover, focus or tap */
+function HelpTip({ where }) {
+  const top = where === 'header';
+  return (
+    <span className="th-help" tabIndex={0} role="button" aria-label={'How the ' + where + ' works'}>?
+      <span className="th-tip" role="tooltip">
+        <b>Three boxes: left, centre and right</b> of the {where}, printed {top ? 'above the text' : 'below the text'} on every page. Leave a box empty to print nothing there.
+        <span className="th-tip-h">Two words are replaced on each page</span>
+        <span className="th-tip-row"><code>{'{page}'}</code> this page's number</span>
+        <span className="th-tip-row"><code>{'{pages}'}</code> how many pages there are</span>
+        <span className="th-tip-h">Example</span>
+        {top
+          ? <span className="th-tip-ex"><span>Quarterly report</span><span></span><span>Acme Pty Ltd</span></span>
+          : <span className="th-tip-ex"><span>Draft · confidential</span><span>Page {'{page}'} of {'{pages}'}</span><span></span></span>}
+        <span className="th-tip-note">{top ? 'prints "Quarterly report" on the left and "Acme Pty Ltd" on the right of each page.' : 'prints "Page 3 of 7" in the centre of page 3.'} Turn on Plain first page to leave a cover page clean.</span>
+      </span>
+    </span>
+  );
+}
+
 /* ---- what each target exposes ---- */
 const TARGET_LABEL = {
   h1: 'Heading 1', h2: 'Heading 2', h3: 'Heading 3', h4: 'Heading 4', p: 'Body text',
   quote: 'Quote', link: 'Link', list: 'List', table: 'Table', image: 'Image', caption: 'Caption',
-  code: 'Code', 'inline-code': 'Code', rule: 'Rule', footnotes: 'Footnotes', pagebreak: 'Page break', vspace: 'Vertical space',
+  code: 'Code', 'inline-code': 'Code', rule: 'Rule', footnotes: 'Footnotes', pagebreak: 'Page break', vspace: 'Vertical space', toc: 'Contents',
 };
 const TARGET_GROUPS = [
   { label: 'Text', items: ['h1', 'h2', 'h3', 'h4', 'p'] },
   { label: 'Elements', items: ['quote', 'list', 'table', 'code', 'link', 'image', 'caption', 'footnotes', 'rule'] },
 ];
-const COLOR_OPTS = { accent: COLOR_SETS.accent, muted: COLOR_SETS.muted, rule: COLOR_SETS.rule, codebg: COLOR_SETS.codebg, ink: COLOR_SETS.ink };
+const COLOR_OPTS = { accent: COLOR_SETS.accent, muted: COLOR_SETS.muted, rule: COLOR_SETS.rule, codebg: COLOR_SETS.codebg, ink: COLOR_SETS.ink, head: COLOR_SETS.head };
 
 function rowsFor(target) {
   if (/^(h[1-4]|p)$/.test(target)) {
@@ -121,9 +138,15 @@ function rowsFor(target) {
       { label: 'Space above', icon: 'spaceA', type: 'step',  v: k.spaceA, unit: 'em', step: 0.05, min: 0 },
       { label: 'Space below', icon: 'spaceB', type: 'step',  v: k.spaceB, unit: 'em', step: 0.05, min: 0 },
       { label: 'Case',        icon: 'case',   type: 'case',  v: k.case },
+      { label: 'Colour',      icon: 'color',  type: 'color', v: k.color, opts: target === 'p' ? 'ink' : 'head' },
       { label: 'Under-bar',   icon: 'bar',    type: 'toggle', v: k.bar, on: '1', off: '0' },
     ];
-    if (target === 'p') rows.push({ label: 'Justify', icon: 'align', type: 'toggle', v: 'body-align', on: 'justify', off: 'left' });
+    if (target === 'p') {
+      rows.push({ label: 'Justify', icon: 'align', type: 'toggle', v: 'body-align', on: 'justify', off: 'left' });
+      rows.push({ label: 'First-line indent', icon: 'indent', type: 'step', v: 'p-indent', unit: 'em', step: 0.25, min: 0, max: 4 });
+    } else {
+      rows.splice(8, 0, { label: 'Align', icon: 'align', type: 'seg', v: k.align, opts: [['left', 'Left'], ['center', 'Centre'], ['right', 'Right']] });
+    }
     return rows;
   }
   switch (target) {
@@ -136,6 +159,7 @@ function rowsFor(target) {
     case 'link': return [
       { label: 'Colour',    icon: 'color', type: 'color', v: 'link-color', opts: 'accent' },
       { label: 'Underline', icon: 'underline', type: 'toggle', v: 'link-deco', on: 'underline', off: 'none' },
+      { label: 'Underline colour', icon: 'color', type: 'color', v: 'link-deco-color', opts: 'accent', off: (vars) => vars['link-deco'] !== 'underline' },
     ];
     case 'list': return [
       { label: 'Marker colour', icon: 'marker', type: 'color', v: 'list-marker', opts: 'muted' },
@@ -179,14 +203,16 @@ function rowsFor(target) {
     case 'page': return [
       { label: 'Top & bottom', icon: 'padY', type: 'step', v: 'pad-y', unit: 'mm', step: 1, min: 5, max: 45 },
       { label: 'Sides', icon: 'padX', type: 'step', v: 'pad-x', unit: 'mm', step: 1, min: 5, max: 45 },
+      { label: 'Widow control', icon: 'lh', type: 'step', v: 'para-lines', unit: ' lines', step: 1, min: 1, max: 5, tip: 'A paragraph that runs over a page end keeps at least this many lines on each page' },
     ];
     case 'global': return [
       { label: 'Heading font', icon: 'font', type: 'headfont' },
       { label: 'Body font', icon: 'font', type: 'font', v: 'font-body' },
-      { label: 'Base size', icon: 'size', type: 'step', v: 'fs-base', unit: 'px', step: 0.5, min: 9, max: 24 },
+      { label: 'Base size', icon: 'size', type: 'basesize', v: 'fs-base', unit: 'px', step: 0.5, min: 9, max: 24, tip: 'Body text size; headings scale with it' },
       { label: 'Line height', icon: 'lh', type: 'step', v: 'lh', step: 0.02, min: 1, max: 2.4 },
       { label: 'Paragraph gap', icon: 'spaceB', type: 'step', v: 'para', unit: 'em', step: 0.05, min: 0, max: 2.5 },
       { label: 'Hyphenate', icon: 'letter', type: 'toggle', v: 'body-hyphens', on: 'auto', off: 'manual' },
+      { label: 'Numbering', icon: 'marker', type: 'seg', v: 'head-num', opts: [['none', 'Off'], ['h1', 'From H1'], ['h2', 'From H2']], tip: 'Number headings 1, 1.1, 1.1.1. "From H2" keeps Heading 1 as an unnumbered title' },
     ];
     case 'colours': return [
       { label: 'Text', icon: 'color', type: 'color', v: 'ink', opts: 'ink' },
@@ -229,6 +255,16 @@ function RowControl({ row, vars, setVar, img }) {
   }
   if (row.type === 'font') return <FontMenu value={val || ''} onChange={(stack) => setVar(v, stack)} />;
   if (row.type === 'headfont') return <FontMenu value={vars['h1-font'] || ''} onChange={(stack) => ['h1', 'h2', 'h3', 'h4'].forEach((l) => setVar(l + '-font', stack))} />;
+  if (row.type === 'seg') return <Seg value={val || row.opts[0][0]} options={row.opts} onChange={(nv) => setVar(v, nv)} />;
+  if (row.type === 'basesize') {
+    // body size changes carry the headings along in proportion
+    const change = (nv) => {
+      const r = parseFloat(nv) / (parseFloat(val) || parseFloat(nv));
+      setVar(v, nv);
+      if (r && r !== 1) ['h1', 'h2', 'h3', 'h4'].forEach((l) => { const hs = parseFloat(vars[l + '-size']); if (hs && /px$/.test(vars[l + '-size'])) setVar(l + '-size', (Math.round(hs * r * 10) / 10) + 'px'); });
+    };
+    return <RowStep value={val} unit={row.unit} step={row.step} min={row.min} max={row.max} onChange={change} />;
+  }
   if (row.type === 'step') return <RowStep value={val} unit={row.unit} step={row.step} min={row.min} max={row.max} onChange={(nv) => setVar(v, nv)} />;
   if (row.type === 'case') {
     const cs = val || 'none';
@@ -239,15 +275,15 @@ function RowControl({ row, vars, setVar, img }) {
     const on = val != null && val !== row.off && val !== '0';
     return <Toggle on={on} onChange={(o) => setVar(v, o ? row.on : row.off)} />;
   }
-  if (row.type === 'color') return <Chips value={val} options={COLOR_OPTS[row.opts] || COLOR_SETS.accent} onChange={(c) => setVar(v, c)} />;
+  if (row.type === 'color') return <Chips value={val} options={COLOR_OPTS[row.opts] || COLOR_SETS.accent} disabled={row.off ? row.off(vars) : false} onChange={(c) => setVar(v, c)} />;
   return null;
 }
 function Inspector({ target, vars, setVar, img }) {
   return (
     <div className="insp">
       {rowsFor(target).map((r) => (
-        <div className={'irow' + (r.type === 'font' ? ' wide' : '')} key={r.label}>
-          <span className="ir-label">{r.icon && <RowIcon name={r.icon} />}<span className="ir-lt">{r.label}</span></span>
+        <div className={'irow' + (r.type === 'font' || r.type === 'headfont' ? ' wide' : '')} key={r.label}>
+          <span className="ir-label" title={r.tip}>{r.icon && <RowIcon name={r.icon} />}<span className="ir-lt">{r.label}</span></span>
           <div className="ir-ctl"><RowControl row={r} vars={vars} setVar={setVar} img={img} /></div>
         </div>
       ))}
@@ -267,7 +303,7 @@ const SECTIONS = [
   { group: 'Inline', items: [{ id: 'link', label: 'Links', glyph: '🔗' }, { id: 'footnotes', label: 'Footnotes', glyph: '¹' }] },
   { group: 'Colours', items: [{ id: 'colours', label: 'Colours', glyph: '◐' }] },
 ];
-const SECTION_OF = { 'inline-code': 'code', pagebreak: 'page', vspace: 'page', h1: 'text', h2: 'text', h3: 'text', h4: 'text', p: 'text' };
+const SECTION_OF = { 'inline-code': 'code', pagebreak: 'page', vspace: 'page', toc: 'text', h1: 'text', h2: 'text', h3: 'text', h4: 'text', p: 'text' };
 /* the levels inside the Text section: vertical tabs on the left, one level's controls on the right */
 const LEVELS_UI = [
   { id: 'global', label: 'All text', glyph: '∀' },
@@ -343,10 +379,9 @@ function ThemePane({ themeId, applyTheme, vars, setVar, onReset, focus, caretIma
                 : <Inspector target={it.id} vars={vars} setVar={setVar} />}
               {it.id === 'page' && (
                 <div className="th-sub">
-                  <div className="th-sublabel">Header and footer, left · centre · right. <code>{'{page}'}</code> and <code>{'{pages}'}</code> become the numbers.</div>
                   {[['Header', header, setHeader, 'spaceA'], ['Footer', footer, setFooter, 'spaceB']].map(([label, val, set, icon]) => (
                     <div className="th-hf" key={label}>
-                      <span className="ir-label"><RowIcon name={icon} /><span className="ir-lt">{label}</span></span>
+                      <span className="ir-label"><RowIcon name={icon} /><span className="ir-lt">{label}</span><HelpTip where={label.toLowerCase()} /></span>
                       {['l', 'c', 'r'].map((k) => <input key={k} className="th-input th-hf-in" value={(val && val[k]) || ''} placeholder={{ l: 'left', c: 'centre', r: 'right' }[k]} onChange={(e) => set({ ...(val || {}), [k]: e.target.value })} />)}
                     </div>
                   ))}

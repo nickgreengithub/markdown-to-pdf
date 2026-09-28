@@ -152,7 +152,7 @@ function constructAt(view, pos) {
 /* the block menu: sections in display order; Suggested first, everything once */
 const MENU = [
   ['Suggested', ['h1', 'h2', 'h3', 'p', 'ul', 'ol', 'image', 'pagebreak']],
-  ['Blocks',    ['h4', 'quote', 'fence', 'table', 'hr', 'task', 'vspace', 'footnote']],
+  ['Blocks',    ['h4', 'quote', 'fence', 'table', 'tcap', 'hr', 'task', 'toc', 'vspace', 'footnote']],
   ['Text',      ['bold', 'italic', 'strike', 'code', 'link', 'br', 'imageAttrs']],
 ];
 const libTick = CM.StateEffect.define();

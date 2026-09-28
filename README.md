@@ -11,21 +11,27 @@ No build step, no backend, no accounts: everything stays in your browser.
   click the `+` that appears beside the current line to change what that line is. Hover
   any construct for help. Lines that reference an image show a thumbnail beneath them.
 - **Preview pane**: the document paginated onto A4 sheets, live. Single, two-up and grid
-  views; zoom or fit-to-width. Tables continue across pages with the header repeated;
-  lists and code blocks split at items and lines; a heading is never left at the bottom
-  of a page. The caret's block is outlined and kept in view; clicking a block moves the
+  views; zoom or fit-to-width. Paragraphs split across pages at a line, keeping at least
+  the "Widow control" number of lines on each side. Tables continue with the header repeated;
+  lists and code blocks split at items and lines; a heading, or a caption above a table,
+  is never left at the bottom of a page. The caret's block is outlined and kept in view; clicking a block moves the
   caret to its source.
 - **Print = preview**: the PDF is made from the very sheets you see, so a page break in
   the preview is a page break on paper. Running header and footer on every page, with
-  `{page}` and `{pages}`.
+  `{page}` and `{pages}` in left, centre and right boxes (the **?** beside them explains),
+  on A4 or US Letter, portrait or landscape, optionally blank on the first page.
 - **Styling**: the left pane's THEME tab holds the theme picker and every control —
   page, each heading level, body text, lists, quote, code, table, rule, images, captions,
-  links, footnotes, colours — all on one page, grouped like the block menu. Click an
-  element on the page and its section scrolls into view. Four themes.
+  links, footnotes, colours — all on one page, grouped like the block menu. Each heading
+  level has its own font, size, weight, spacing, case, colour and alignment; All text
+  holds base size (headings scale with it), line height, hyphenation and automatic
+  heading numbering. Click an element on the page and its section scrolls into view.
+  Eleven themes: Report, Academic, Editorial, Book, Technical, Modern, Minimal, Letter,
+  Memo, Résumé and Compact.
 - **Images**: paste or drop an image anywhere; it is stored in your browser under a short
   name and `![](name)` lands at the caret, with a thumbnail under the line. Add a quoted
-  title for the caption. Nothing to manage; "Remove unused images" lives in the Document
-  menu.
+  title for the caption. Nothing to manage; "Remove unused images" lives in the New document
+  dialog.
 - **Persistence**: cache only — the markdown and your style choices live in
   `localStorage`, images in IndexedDB. Nothing is uploaded or saved anywhere else.
 
@@ -38,6 +44,9 @@ CommonMark + GFM tables, strikethrough and task lists, plus:
 | `\pagebreak` | Force a new page |
 | `\` alone on a line | One blank line of vertical space; repeat for more |
 | `\vspace 3` | Three blank lines of vertical space |
+| `\toc` | A table of contents of the headings after it (H1–H3), with page numbers |
+| `Table: Caption` | Directly above or below a table: its caption |
+| `## Heading {-}` | Leave this heading out of automatic numbering |
 | `text\` at the end of a line | A line break without a new paragraph |
 | `![alt](name "Figure 2. Caption")` | An image from the library; the title is the caption (inline markdown allowed) |
 | `![alt](name "…"){width=50% align=right}` | Width and alignment — the style popover writes these for you |

@@ -196,8 +196,8 @@ body.dragging * { cursor: col-resize !important; }
 .themepane { flex: 1; min-height: 0; overflow: auto; padding: 10px 14px 40px; background: var(--md-bg); }
 .th-top { display: flex; align-items: center; gap: 8px; padding-bottom: 10px; margin-bottom: 4px; border-bottom: 1px solid var(--edge); }
 /* the theme picker: one row, each name in its theme's heading face */
-.th-themes { flex: 1; display: flex; gap: 2px; padding: 2px; border: 1px solid var(--edge); border-radius: 8px; background: var(--field); }
-.th-theme { flex: 1; height: 30px; border: 0; border-radius: 6px; background: transparent; font-size: 13.5px; font-weight: 600; color: var(--text-2); }
+.th-themes { flex: 1; display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 2px; padding: 2px; border: 1px solid var(--edge); border-radius: 8px; background: var(--field); }
+.th-theme { height: 30px; border: 0; border-radius: 6px; background: transparent; font-size: 13.5px; font-weight: 600; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 6px; }
 .th-theme:hover { color: var(--text); }
 .th-theme.on { background: var(--panel); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
 .th-hf { display: grid; grid-template-columns: 140px 1fr 1fr 1fr; align-items: center; gap: 6px; min-height: 34px; }
@@ -316,3 +316,18 @@ body.dragging * { cursor: col-resize !important; }
 }
 
 #print-root { display: none; }
+
+/* "?" help next to Header / Footer */
+.th-help { position: relative; display: inline-grid; place-items: center; width: 15px; height: 15px; margin-left: 6px; border-radius: 50%; background: var(--field); border: 1px solid var(--edge); color: var(--text-2); font-size: 10px; font-weight: 700; cursor: help; flex: none; outline: none; }
+.th-help:hover, .th-help:focus { background: var(--text); color: var(--panel); border-color: var(--text); }
+.th-tip { display: none; position: absolute; z-index: 40; top: calc(100% + 8px); left: -10px; width: 300px; padding: 11px 13px 12px; border-radius: 10px; background: #1c1917; color: #e7e5e4; font-size: 12px; font-weight: 400; line-height: 1.5; text-align: left; box-shadow: 0 10px 30px rgba(0,0,0,.22); cursor: default; white-space: normal; letter-spacing: 0; text-transform: none; }
+.th-tip::before { content: ''; position: absolute; top: -5px; left: 14px; width: 10px; height: 10px; background: #1c1917; transform: rotate(45deg); }
+.th-help:hover .th-tip, .th-help:focus .th-tip, .th-help:focus-within .th-tip { display: block; }
+.th-tip b { color: #fff; font-weight: 600; }
+.th-tip code { background: rgba(255,255,255,.12); color: #fff; padding: 0 4px; border-radius: 4px; font-size: 11.5px; }
+.th-tip-h { display: block; margin: 8px 0 3px; font-size: 9.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #a8a29e; }
+.th-tip-row { display: block; }
+.th-tip-ex { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; margin: 2px 0 5px; }
+.th-tip-ex > span { min-height: 22px; padding: 3px 6px; border-radius: 5px; background: rgba(255,255,255,.1); color: #fff; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.th-tip-ex > span:empty { background: transparent; border: 1px dashed rgba(255,255,255,.2); }
+.th-tip-note { display: block; color: #d6d3d1; }

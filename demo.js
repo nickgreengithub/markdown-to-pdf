@@ -44,9 +44,11 @@ window.DEMO = (() => {
 
 > **Abstract.** We investigate whether humans can be fired through a steel straw at airline speeds without spilling their coffee. Findings: the speed is achievable; the coffee is not. Funding generously provided by a man who *really* hates traffic.[^1]
 
+\\toc
+
 ---
 
-## 1. Introduction
+## Introduction
 
 For over a century, engineers have dreamed of travel that is **faster than a train**, *cheaper than a plane*, and ~~financially realistic~~ visionary. The Hyperloop promises all three, provided you ignore the third. At its core the concept is simple: remove the air, add a pod, and let physics do the marketing.
 
@@ -54,7 +56,7 @@ As the great philosophers noted, \`velocity = distance / vibes\`. We adopt this 
 
 See also our earlier work, [On the Feasibility of Catapulting Commuters](https://example.org/catapult), which the ethics board described as "a cry for help."
 
-### 1.1 Research Questions
+### Research Questions
 
 - Can a pod reach 1,200 km/h without turning lunch into a wall decoration?
 - Will passengers accept windows that show only darkness?
@@ -62,7 +64,7 @@ See also our earlier work, [On the Feasibility of Catapulting Commuters](https:/
   - Follow-up to the follow-up: is a painted-on window a window?
 - Is "mild existential dread" an acceptable in-flight amenity?
 
-### 1.2 A Note on Tone
+### A Note on Tone
 
 This paragraph exists purely so the **Body** style can prove it stays calm and readable, even while the surrounding text describes terrifying acceleration. Well done, body text. Stay strong.
 
@@ -75,7 +77,7 @@ The blank line above comes from a lone \`\\\` on its own line. Below, \`\\vspace
 \\vspace 2
 And here the text resumes.
 
-## 2. Methodology
+## Methodology
 
 We built a test rig from **two vacuum cleaners**, *a garden hose*, and unshakable confidence. Measurements were taken in \`SI units\`, then quietly converted to "feels about right."
 
@@ -93,7 +95,7 @@ Inline check: we call \`passenger_g_force(1200, 0.3)\` before boarding and, for 
 
 ![The test pod, mid-tube](pod-diagram "Figure 1. The pod in its natural habitat. Speed lines are illustrative and, frankly, aspirational.")
 
-### 2.1 Test Schedule
+### Test Schedule
 
 1. Build tube
 2. Briefly question life choices
@@ -103,7 +105,7 @@ Inline check: we call \`passenger_g_force(1200, 0.3)\` before boarding and, for 
 
 \\pagebreak
 
-## 3. Results
+## Results
 
 The data are summarized below. The trends are, scientifically, going up.
 
@@ -124,7 +126,7 @@ The data are summarized below. The trends are, scientifically, going up.
 
 The image above is set to 40% width and aligned right — written into the markdown as \`{width=40% align=right}\`, which the style popover in the preview does for you when you click an image and pick a width.
 
-### 3.1 Safety Checklist
+### Safety Checklist
 
 - [x] Tube is, in fact, a tube
 - [x] Pod fits inside tube
@@ -132,11 +134,13 @@ The image above is set to 40% width and aligned right — written into the markd
 - [ ] Emergency exit identified
 - [ ] Reason the emergency exit does not exist
 
-#### 3.1.1 Minor Concerns
+#### Minor Concerns
 
 A small heading-four note for completeness: the brakes are currently best described as "aspirational."[^2]
 
-## 4. Risk Assessment
+## Risk Assessment
+
+Table: Risk register, as rated by the team in a single optimistic afternoon.
 
 | Risk                | Likelihood | Impact |     Mitigation      |
 |---------------------|:----------:|:------:|:-------------------:|
@@ -146,7 +150,7 @@ A small heading-four note for completeness: the brakes are currently best descri
 
 Note: the "Low (ish)" rating was supplied by our most enthusiastic intern.
 
-### 4.1 The Full Incident Log
+### The Full Incident Log
 
 A long table continues onto the next page with its header repeated — which is exactly what this one is here to demonstrate.
 
@@ -169,19 +173,19 @@ A long table continues onto the next page with its header repeated — which is 
 |  15 | 23 March   |            0 | Investors informed the tube is "cloud".  |
 |  16 | 24 March   |            0 | Funding round closes, oversubscribed.    |
 
-## 5. Conclusion
+## Conclusion
 
 The Hyperloop is **technically possible**, *spiritually questionable*, and **financially** — let's move on. We recommend immediate funding, a slightly longer tube, and dramatically better coffee lids.
 
 ---
 
-### Appendix A — Glossary
+## Appendix A — Glossary {-}
 
 Terms: **Pod** a tube for a person, inside a tube for the pod · **Vacuum** the thing our budget abhors · **Soon™** any time between next quarter and the heat death of the universe.
 
-### Appendix B — How this document was made
+## Appendix B — How this document was made {-}
 
-Everything you see is plain Markdown in the left pane, plus a few extras: \`\\pagebreak\` for a page break, \`\\\` on its own line for a blank line, a quoted title after an image for its caption, and \`{width=50% align=right}\` after an image to size it. Type \`/\` at the start of a line for the full list, or open the syntax reference with the **?** button.
+Everything you see is plain Markdown in the left pane, plus a few extras: \`\\pagebreak\` for a page break, \`\\\` on its own line for a blank line, a quoted title after an image for its caption, and \`{width=50% align=right}\` after an image to size it. \`\\toc\` makes the contents list at the top, and a line starting \`Table:\` next to a table becomes its caption. Type \`/\` at the start of a line for the full list, or \`\\\` for the layout commands.
 
 *End of report. Replace it with your own Markdown — unless you, too, dream of tubes.*
 

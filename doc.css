@@ -116,6 +116,12 @@
   margin: var(--h4-space, 1.1em) 0 var(--h4-space-below, 0.5em);
   padding-bottom: calc(var(--h4-bar, 0) * 0.2em); border-bottom: calc(var(--h4-bar, 0) * 1px) solid var(--rule);
 }
+.doc h1 { color: var(--h1-color, var(--ink)); text-align: var(--h1-align, left); }
+.doc h2 { color: var(--h2-color, var(--ink)); text-align: var(--h2-align, left); }
+.doc h3 { color: var(--h3-color, var(--ink)); text-align: var(--h3-align, left); }
+.doc h4 { color: var(--h4-color, var(--ink)); text-align: var(--h4-align, left); }
+/* heading numbers (Numbering in All text) */
+.doc .hnum { margin-right: 0.55em; font-variant-numeric: tabular-nums; color: var(--num-color, inherit); }
 .doc h5 { font-family: var(--h4-font); font-size: calc(var(--h4-size, 1em) * 0.92); font-weight: var(--h4-weight, 600); line-height: 1.3; margin: 1em 0 0.45em; }
 .doc h6 { font-family: var(--h4-font); font-size: calc(var(--h4-size, 1em) * 0.84); font-weight: 600; line-height: 1.3; margin: 1em 0 0.45em; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
 
@@ -124,7 +130,11 @@
   text-align: var(--body-align, justify); hyphens: var(--body-hyphens, auto); margin: var(--para-above, 0em) 0 var(--para);
   padding-bottom: calc(var(--body-bar, 0) * 0.25em); border-bottom: calc(var(--body-bar, 0) * 1px) solid var(--rule);
 }
-.doc a { color: var(--link-color, var(--accent)); text-decoration-line: var(--link-deco, none); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+.doc p + p { text-indent: var(--p-indent, 0em); }
+.doc p.tcap, .doc p.split-rest { text-indent: 0; }
+/* a paragraph that continues on the next page: its last line here is a full line */
+.doc p.split-head { text-align-last: var(--body-align, justify); margin-bottom: 0; }
+.doc a { color: var(--link-color, var(--accent)); text-decoration-line: var(--link-deco, none); text-decoration-color: var(--link-deco-color, currentColor); text-decoration-thickness: 1px; text-underline-offset: 2px; }
 .doc strong { font-weight: 700; }
 .doc em { font-style: italic; }
 .doc del, .doc s { color: var(--muted); }
@@ -190,6 +200,25 @@
   font-size: var(--cap-size, 0.85em); color: var(--cap-color, var(--muted)); font-style: var(--cap-style, normal);
   text-align: var(--cap-align, center); margin-top: 0.45em; line-height: 1.4; hyphens: none;
 }
+.doc p.tcap {
+  font-size: var(--cap-size, 0.85em); color: var(--cap-color, var(--muted)); font-style: var(--cap-style, normal);
+  text-align: var(--cap-align, center); line-height: 1.4; hyphens: none; padding: 0; border: 0;
+}
+.doc p.tcap-above { margin: 0.4em 0 0.45em; }
+.doc table + p.tcap-below { margin-top: -0.35em; }
+
+/* \toc — contents with dotted leaders; numbers filled in after pagination */
+.doc ul.toc { list-style: none; padding: 0; margin: 0.8em 0 max(var(--para), 1em); }
+.doc ul.toc > li { display: flex; align-items: baseline; gap: 0.45em; margin: 0 0 0.4em; }
+.doc .toc-t { flex: 0 1 auto; }
+.doc .toc-n { display: inline-block; min-width: 2.1em; color: var(--muted); font-variant-numeric: tabular-nums; }
+.doc .toc-dots { flex: 1 1 1.5em; border-bottom: 1.5px dotted color-mix(in srgb, var(--muted) 60%, transparent); transform: translateY(-0.28em); }
+.doc .toc-pg { flex: none; min-width: 1.4em; text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+.doc .toc-d0 { font-weight: 600; margin-top: 0.55em; }
+.doc ul.toc > li.toc-d0:first-child { margin-top: 0; }
+.doc .toc-d1 { padding-left: 1.4em; }
+.doc .toc-d2 { padding-left: 2.8em; font-size: 0.94em; }
+.doc .toc-empty { color: var(--muted); font-style: italic; border: 1px dashed var(--rule); padding: 0.6em 0.9em; margin: 0 0 var(--para); }
 .doc .img-missing {
   display: inline-block; padding: 0.5em 0.9em; border: 1.5px dashed #b6bcc6; border-radius: 6px; background: #f5f6f8;
   color: #5b6470; font-family: system-ui, sans-serif; font-size: 0.82rem; font-style: normal; line-height: 1.35;

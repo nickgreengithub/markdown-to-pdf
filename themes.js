@@ -1,68 +1,147 @@
 /* Font library — value of each --font-* variable is a full stack */
 window.FONTS = [
-  { label: 'Public Sans',   stack: "'Public Sans', system-ui, sans-serif" },
-  { label: 'Libre Franklin',stack: "'Libre Franklin', system-ui, sans-serif" },
-  { label: 'IBM Plex Sans', stack: "'IBM Plex Sans', system-ui, sans-serif" },
-  { label: 'Source Serif 4',stack: "'Source Serif 4', Georgia, serif" },
-  { label: 'Spectral',      stack: "'Spectral', Georgia, serif" },
-  { label: 'Newsreader',    stack: "'Newsreader', Georgia, serif" },
-  { label: 'IBM Plex Mono', stack: "'IBM Plex Mono', ui-monospace, monospace" },
-];
-
-/* The editable CSS variables, in display order, with control metadata */
-window.VAR_SPEC = [
-  { key: 'font-body', label: 'Body font',     type: 'font' },
-  { key: 'font-head', label: 'Heading font',  type: 'font' },
-  { key: 'font-mono', label: 'Mono font',     type: 'font' },
-  { key: 'fs-base',   label: 'Base size',     type: 'range', min: 11, max: 20, step: 0.5, unit: 'px' },
-  { key: 'lh',        label: 'Line height',   type: 'range', min: 1.2, max: 2.0, step: 0.02, unit: '' },
-  { key: 'scale',     label: 'Heading scale', type: 'range', min: 1.08, max: 1.5, step: 0.01, unit: '' },
-  { key: 'para',      label: 'Paragraph gap', type: 'range', min: 0.3, max: 1.6, step: 0.05, unit: 'em' },
-  { key: 'page-pad',  label: 'Page margin',   type: 'range', min: 8, max: 35, step: 1, unit: 'mm' },
-  { key: 'measure',   label: 'Text measure',  type: 'measure' },
-  { key: 'ink',       label: 'Text',          type: 'color' },
-  { key: 'accent',    label: 'Accent',        type: 'color' },
-  { key: 'muted',     label: 'Muted',         type: 'color' },
-  { key: 'rule',      label: 'Rules / borders', type: 'color' },
-  { key: 'code-bg',   label: 'Code background', type: 'color' },
+  { label: 'Public Sans',    stack: "'Public Sans', system-ui, sans-serif" },
+  { label: 'Inter',          stack: "'Inter', system-ui, sans-serif" },
+  { label: 'Libre Franklin', stack: "'Libre Franklin', system-ui, sans-serif" },
+  { label: 'IBM Plex Sans',  stack: "'IBM Plex Sans', system-ui, sans-serif" },
+  { label: 'Space Grotesk',  stack: "'Space Grotesk', system-ui, sans-serif" },
+  { label: 'Source Serif 4', stack: "'Source Serif 4', Georgia, serif" },
+  { label: 'Spectral',       stack: "'Spectral', Georgia, serif" },
+  { label: 'Newsreader',     stack: "'Newsreader', Georgia, serif" },
+  { label: 'Lora',           stack: "'Lora', Georgia, serif" },
+  { label: 'EB Garamond',    stack: "'EB Garamond', Garamond, Georgia, serif" },
+  { label: 'Fraunces',       stack: "'Fraunces', Georgia, serif" },
+  { label: 'IBM Plex Mono',  stack: "'IBM Plex Mono', ui-monospace, monospace" },
 ];
 
 const SANS  = "'Public Sans', system-ui, sans-serif";
+const INTER = "'Inter', system-ui, sans-serif";
 const FRANK = "'Libre Franklin', system-ui, sans-serif";
+const PLEX  = "'IBM Plex Sans', system-ui, sans-serif";
+const GROT  = "'Space Grotesk', system-ui, sans-serif";
 const SERIF = "'Source Serif 4', Georgia, serif";
 const SPECT = "'Spectral', Georgia, serif";
 const NEWS  = "'Newsreader', Georgia, serif";
+const LORA  = "'Lora', Georgia, serif";
+const GARA  = "'EB Garamond', Garamond, Georgia, serif";
+const FRAUN = "'Fraunces', Georgia, serif";
 const MONO  = "'IBM Plex Mono', ui-monospace, monospace";
 
+/* A theme sets the shared variables below; any "h1-…" … "h4-…" key overrides
+   that one heading level after the sizes are derived from base × scale^n.  */
 window.THEMES = [
   {
     id: 'report', name: 'Report', note: 'Clean sans report',
     vars: {
       'font-body': SANS, 'font-head': SANS, 'font-mono': MONO,
-      'fs-base': '15.5px', 'lh': '1.65', 'scale': '1.2', 'para': '0.9em',
-      'page-pad': '20mm', 'measure': 'none',
-      'ink': '#1b1d22', 'paper': '#ffffff', 'accent': '#2f64e6',
-      'muted': '#6b7280', 'rule': '#e6e8ec', 'code-bg': '#f4f5f8',
+      'fs-base': '15px', 'lh': '1.62', 'scale': '1.22', 'para': '0.85em',
+      'page-pad': '20mm', 'head-weight': '650', 'head-num': 'h2', 'num-color': '#2f64e6',
+      'h2-color': '#1d4ed8', 'h2-bar': '0', 'h1-bar': '1',
+      'ink': '#1b1d22', 'accent': '#2f64e6',
+      'muted': '#6b7280', 'rule': '#e3e6eb', 'code-bg': '#f4f5f8',
     },
   },
   {
-    id: 'academic', name: 'Academic', note: 'Classic serif',
+    id: 'academic', name: 'Academic', note: 'Numbered sections, indented paragraphs',
     vars: {
       'font-body': SERIF, 'font-head': SERIF, 'font-mono': MONO,
-      'fs-base': '16px', 'lh': '1.72', 'scale': '1.22', 'para': '0.95em',
-      'page-pad': '26mm', 'measure': 'none',
-      'ink': '#1c1a16', 'paper': '#ffffff', 'accent': '#8a2b21',
-      'muted': '#6f685c', 'rule': '#e7e1d4', 'code-bg': '#f4f0e7',
+      'fs-base': '15.5px', 'lh': '1.66', 'scale': '1.18', 'para': '0em', 'p-indent': '1.5em',
+      'page-pad': '25mm', 'head-weight': '600', 'head-tracking': '0em', 'head-num': 'h2',
+      'h1-align': 'center', 'h1-bar': '0', 'h1-weight': '600', 'h1-space-below': '1.1em', 'h2-bar': '0',
+      'h2-space-below': '0.4em', 'h3-space-below': '0.3em', 'h3-weight': '600',
+      'bq-style': 'normal', 'cap-style': 'italic', 'link-deco': 'underline',
+      'ink': '#1c1a16', 'accent': '#8a2b21',
+      'muted': '#6f685c', 'rule': '#e2dccf', 'code-bg': '#f4f0e7',
     },
   },
   {
-    id: 'editorial', name: 'Editorial', note: 'Magazine display',
+    id: 'editorial', name: 'Editorial', note: 'Magazine feature',
     vars: {
       'font-body': SPECT, 'font-head': NEWS, 'font-mono': MONO,
-      'fs-base': '17px', 'lh': '1.74', 'scale': '1.34', 'para': '1em',
-      'page-pad': '22mm', 'measure': 'none',
-      'ink': '#1a1613', 'paper': '#ffffff', 'accent': '#b8402a',
+      'fs-base': '16.5px', 'lh': '1.72', 'scale': '1.36', 'para': '0.95em',
+      'page-pad': '22mm', 'head-weight': '500', 'head-tracking': '-0.015em',
+      'h1-bar': '0', 'h1-lh': '1.04', 'h2-bar': '0', 'h2-color': '#b8402a', 'h2-weight': '500',
+      'h3-case': 'uppercase', 'h3-track': '0.08em', 'h3-weight': '600', 'h3-size': '12.5px', 'h3-font': SPECT,
+      'bq-border-w': '0px', 'cap-style': 'italic',
+      'ink': '#1a1613', 'accent': '#b8402a',
       'muted': '#7d7368', 'rule': '#eae3da', 'code-bg': '#f6f1ec',
+    },
+  },
+  {
+    id: 'book', name: 'Book', note: 'Garamond, centred headings, indents',
+    vars: {
+      'font-body': GARA, 'font-head': GARA, 'font-mono': MONO,
+      'fs-base': '16.5px', 'lh': '1.58', 'scale': '1.2', 'para': '0em', 'p-indent': '1.4em',
+      'pad-y': '24mm', 'pad-x': '26mm', 'head-weight': '500', 'head-tracking': '0em',
+      'h1-align': 'center', 'h1-bar': '0', 'h1-weight': '400', 'h1-space-below': '1.4em', 'h1-track': '0.01em',
+      'h2-align': 'center', 'h2-bar': '0', 'h2-case': 'uppercase', 'h2-track': '0.14em', 'h2-size': '14px', 'h2-weight': '500', 'h2-space': '2.2em', 'h2-space-below': '1em',
+      'h3-case': 'none', 'h3-weight': '500', 'h3-size': '17px', 'h3-lh': '1.3',
+      'bq-border-w': '0px', 'bq-style': 'italic', 'cap-style': 'italic', 'tbl-stripe': '0',
+      'ink': '#221e19', 'accent': '#7a4b1f',
+      'muted': '#80766a', 'rule': '#ddd4c6', 'code-bg': '#f5f0e8',
+    },
+  },
+  {
+    id: 'technical', name: 'Technical', note: 'Numbered spec with strong code',
+    vars: {
+      'font-body': INTER, 'font-head': INTER, 'font-mono': MONO,
+      'fs-base': '14px', 'lh': '1.6', 'scale': '1.2', 'para': '0.8em',
+      'page-pad': '20mm', 'head-weight': '650', 'head-tracking': '-0.015em', 'head-num': 'h2',
+      'body-align': 'left', 'num-color': '#0e7490',
+      'h1-bar': '0', 'h2-bar': '1', 'h2-space': '1.7em',
+      'code-size': '0.86em', 'tbl-size': '0.92em', 'link-deco': 'underline', 'link-deco-color': '#a5d8e3',
+      'ink': '#111827', 'accent': '#0e7490',
+      'muted': '#6b7280', 'rule': '#e5e7eb', 'code-bg': '#f3f6f8',
+    },
+  },
+  {
+    id: 'modern', name: 'Modern', note: 'Bold grotesk headings, violet accent',
+    vars: {
+      'font-body': INTER, 'font-head': GROT, 'font-mono': MONO,
+      'fs-base': '15px', 'lh': '1.65', 'scale': '1.28', 'para': '0.9em',
+      'page-pad': '20mm', 'head-weight': '700', 'head-tracking': '-0.025em',
+      'body-align': 'left', 'h1-bar': '0', 'h1-lh': '1.05', 'h2-bar': '0', 'h2-color': '#6d28d9',
+      'h4-case': 'uppercase', 'h4-track': '0.06em', 'h4-size': '12px',
+      'bq-border-w': '4px', 'tbl-stripe': '1',
+      'ink': '#18181b', 'accent': '#6d28d9',
+      'muted': '#71717a', 'rule': '#e4e4e7', 'code-bg': '#f4f4f5',
+    },
+  },
+  {
+    id: 'minimal', name: 'Minimal', note: 'Quiet, light and airy',
+    vars: {
+      'font-body': INTER, 'font-head': INTER, 'font-mono': MONO,
+      'fs-base': '14.5px', 'lh': '1.72', 'scale': '1.18', 'para': '1em',
+      'pad-y': '24mm', 'pad-x': '26mm', 'head-weight': '500', 'head-tracking': '-0.01em',
+      'body-align': 'left', 'h1-bar': '0', 'h2-bar': '0', 'h1-weight': '400', 'h2-color': '#52525b',
+      'h3-color': '#71717a', 'h4-color': '#71717a',
+      'bq-border-w': '1px', 'bq-style': 'normal', 'code-border': '0', 'tbl-stripe': '0', 'img-radius': '0',
+      'ink': '#27272a', 'accent': '#3f3f46',
+      'muted': '#a1a1aa', 'rule': '#ececee', 'code-bg': '#f7f7f8',
+    },
+  },
+  {
+    id: 'letter', name: 'Letter', note: 'Warm serif for letters and proposals',
+    vars: {
+      'font-body': LORA, 'font-head': FRAUN, 'font-mono': MONO,
+      'fs-base': '14.5px', 'lh': '1.64', 'scale': '1.24', 'para': '0.95em',
+      'pad-y': '24mm', 'pad-x': '25mm', 'head-weight': '600', 'head-tracking': '-0.01em',
+      'body-align': 'left', 'h1-bar': '0', 'h1-color': '#5b2a4e', 'h2-bar': '0', 'h2-color': '#5b2a4e',
+      'bq-style': 'italic', 'cap-style': 'italic',
+      'ink': '#231f20', 'accent': '#8e3b74',
+      'muted': '#7b6f73', 'rule': '#eadfe4', 'code-bg': '#f7f1f4',
+    },
+  },
+  {
+    id: 'memo', name: 'Memo', note: 'Plain business memo',
+    vars: {
+      'font-body': PLEX, 'font-head': PLEX, 'font-mono': MONO,
+      'fs-base': '13.5px', 'lh': '1.55', 'scale': '1.16', 'para': '0.75em',
+      'page-pad': '20mm', 'head-weight': '600', 'head-tracking': '0em',
+      'body-align': 'left', 'h1-bar': '1', 'h1-case': 'uppercase', 'h1-track': '0.06em', 'h1-size': '19px',
+      'h2-bar': '0', 'h2-color': '#1e3a5f',
+      'ink': '#1f2328', 'accent': '#1e3a5f',
+      'muted': '#656d76', 'rule': '#d8dee4', 'code-bg': '#f3f5f7',
     },
   },
   {
@@ -70,11 +149,12 @@ window.THEMES = [
     vars: {
       'font-body': SANS, 'font-head': SANS, 'font-mono': MONO,
       'fs-base': '11.5px', 'lh': '1.42', 'scale': '1.16', 'para': '0.45em',
-      'page-pad': '15mm', 'pad-x': '17mm', 'measure': 'none',
+      'page-pad': '15mm', 'pad-x': '17mm',
       'head-weight': '700', 'head-tracking': '0.02em', 'head-transform': 'uppercase',
-      'h1-bar': '0', 'h2-bar': '1', 'h3-bar': '0', 'h3-case': 'none', 'h4-case': 'none', 'body-align': 'left',
+      'h1-bar': '0', 'h1-size': '24px', 'h1-track': '0.04em', 'h2-bar': '1', 'h2-color': '#1f4ed8', 'h2-track': '0.08em', 'h2-size': '12.5px',
+      'h3-bar': '0', 'h3-case': 'none', 'h4-case': 'none', 'body-align': 'left',
       'tbl-size': '1em', 'tbl-stripe': '0',
-      'ink': '#1c1f26', 'paper': '#ffffff', 'accent': '#1f4ed8',
+      'ink': '#1c1f26', 'accent': '#1f4ed8',
       'muted': '#5b6470', 'rule': '#d9dde3', 'code-bg': '#f3f4f6',
     },
   },
@@ -83,8 +163,8 @@ window.THEMES = [
     vars: {
       'font-body': FRANK, 'font-head': FRANK, 'font-mono': MONO,
       'fs-base': '12.5px', 'lh': '1.45', 'scale': '1.14', 'para': '0.6em',
-      'page-pad': '14mm', 'measure': 'none',
-      'ink': '#1a1a1a', 'paper': '#ffffff', 'accent': '#444444',
+      'page-pad': '14mm', 'body-align': 'left', 'para-lines': '1',
+      'ink': '#1a1a1a', 'accent': '#444444',
       'muted': '#777777', 'rule': '#e4e4e4', 'code-bg': '#f5f5f5',
     },
   },
@@ -102,9 +182,9 @@ window.LEVELS = [
 /* The CSS-variable keys a given level owns (used by cells + doc.css). */
 window.levelKeys = function (lvl) {
   if (lvl === 'p') {
-    return { font: 'font-body', size: 'fs-base', weight: 'body-weight', lh: 'lh', track: 'body-track', spaceA: 'para-above', spaceB: 'para', case: 'body-case', bar: 'body-bar' };
+    return { font: 'font-body', size: 'fs-base', weight: 'body-weight', lh: 'lh', track: 'body-track', spaceA: 'para-above', spaceB: 'para', case: 'body-case', bar: 'body-bar', color: 'ink', align: 'body-align' };
   }
-  return { font: lvl + '-font', size: lvl + '-size', weight: lvl + '-weight', lh: lvl + '-lh', track: lvl + '-track', spaceA: lvl + '-space', spaceB: lvl + '-space-below', case: lvl + '-case', bar: lvl + '-bar' };
+  return { font: lvl + '-font', size: lvl + '-size', weight: lvl + '-weight', lh: lvl + '-lh', track: lvl + '-track', spaceA: lvl + '-space', spaceB: lvl + '-space-below', case: lvl + '-case', bar: lvl + '-bar', color: lvl + '-color', align: lvl + '-align' };
 };
 
 /* Expand an authored theme into the full per-level variable set that the
@@ -143,6 +223,10 @@ window.expandTheme = function (v) {
     'cap-size': v['cap-size'] || '0.85em', 'cap-color': v['cap-color'] || v['muted'], 'cap-style': v['cap-style'] || 'normal', 'cap-align': v['cap-align'] || 'center',
     'fn-size': v['fn-size'] || '0.82em', 'fn-color': v['fn-color'] || v['muted'],
     'body-hyphens': v['body-hyphens'] || 'auto',
+    'p-indent': v['p-indent'] || '0em',
+    'link-deco-color': v['link-deco-color'] || 'currentColor',
+    'head-num': v['head-num'] || 'none', 'num-color': v['num-color'] || 'inherit',
+    'para-lines': v['para-lines'] || '2',
   };
   ['h1', 'h2', 'h3', 'h4'].forEach((L) => {
     out[L + '-font'] = v['font-head'];
@@ -154,7 +238,11 @@ window.expandTheme = function (v) {
     out[L + '-space-below'] = spcB[L];
     out[L + '-case'] = v[L + '-case'] || hc;   // a theme may exempt a level from the heading case
     out[L + '-bar'] = v[L + '-bar'] || bars[L];
+    out[L + '-color'] = v['head-color'] || v['ink'];
+    out[L + '-align'] = 'left';
   });
+  // per-level overrides a theme spells out
+  Object.keys(v).forEach((k) => { if (/^h[1-4]-/.test(k)) out[k] = v[k]; });
   return out;
 };
 
@@ -172,5 +260,7 @@ window.CSS_ORDER = [
   'tbl-head-bg', 'tbl-border', 'tbl-pad-y', 'tbl-pad-x',
   'img-width', 'img-radius', 'body-align', 'tbl-size', 'tbl-stripe', 'code-size', 'code-border',
   'cap-size', 'cap-color', 'cap-style', 'cap-align', 'fn-size', 'fn-color',
+  'h1-color', 'h2-color', 'h3-color', 'h4-color', 'h1-align', 'h2-align', 'h3-align', 'h4-align',
+  'p-indent', 'link-deco-color', 'head-num', 'num-color', 'para-lines', 'body-hyphens',
   'pad-y', 'pad-x', 'measure', 'ink', 'paper', 'accent', 'muted', 'rule', 'code-bg',
 ];

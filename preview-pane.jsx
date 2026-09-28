@@ -25,6 +25,7 @@ function targetOf(el) {
     if (inl.tagName === 'FIGCAPTION') return 'caption';
     if (inl.tagName === 'CODE') return inl.closest('pre') ? 'code' : 'inline-code';
   }
+  if (el.closest('.toc')) return 'toc';
   const b = el.closest('h1, h2, h3, h4, h5, h6, p, li, ul, ol, blockquote, table, figure, pre, hr, .pagebreak, .vspace, section.footnotes');
   if (!b) return 'p';
   const t = b.tagName;
@@ -35,6 +36,7 @@ function targetOf(el) {
   if (t === 'FIGURE') return 'image';
   if (t === 'PRE') return 'code';
   if (t === 'HR') return 'rule';
+  if (b.classList.contains('tcap')) return 'caption';
   if (b.classList.contains('pagebreak')) return 'pagebreak';
   if (b.classList.contains('vspace')) return 'vspace';
   if (b.classList.contains('footnotes')) return 'footnotes';
@@ -95,7 +97,8 @@ function PreviewPane({ html, vars, mode, zoom, header, footer, page, currentLine
         if (!token()) return;
         const padY = parseFloat(getComputedStyle(measure).paddingTop) || 0;
         const furniture = { header, footer, firstPlain: !!(page && page.firstPlain) };
-        const res = await Paginate.paginate(html, { measure, pageH: pageHpx, padY, ...furniture, token });
+        const minLines = parseInt(vars && vars['--para-lines'], 10) || 2;
+        const res = await Paginate.paginate(html, { measure, pageH: pageHpx, padY, minLines, ...furniture, token });
         if (!res || !token() || cancelled) return;
         const keepScroll = scrollRef.current ? scrollRef.current.scrollTop : 0;
         sheets.replaceChildren(...res.sheets);

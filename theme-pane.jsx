@@ -245,11 +245,7 @@ function Inspector({ target, vars, setVar, img }) {
 /* ---- the pane ---- */
 const SECTIONS = [
   { group: 'Page', items: [{ id: 'page', label: 'Page', glyph: '▭' }] },
-  { group: 'Text', items: [
-    { id: 'h1', label: 'Heading 1', glyph: 'H1' }, { id: 'h2', label: 'Heading 2', glyph: 'H2' },
-    { id: 'h3', label: 'Heading 3', glyph: 'H3' }, { id: 'h4', label: 'Heading 4', glyph: 'H4' },
-    { id: 'p', label: 'Body text', glyph: 'Aa' },
-  ] },
+  { group: 'Text', items: [{ id: 'text', label: 'Text', glyph: 'Aa' }] },
   { group: 'Blocks', items: [
     { id: 'list', label: 'Lists', glyph: '•' }, { id: 'quote', label: 'Quote', glyph: '❝' },
     { id: 'code', label: 'Code', glyph: '{ }' }, { id: 'table', label: 'Table', glyph: '▦' }, { id: 'rule', label: 'Rule', glyph: '—' },
@@ -258,10 +254,35 @@ const SECTIONS = [
   { group: 'Inline', items: [{ id: 'link', label: 'Links', glyph: '🔗' }, { id: 'footnotes', label: 'Footnotes', glyph: '¹' }] },
   { group: 'Colours', items: [{ id: 'colours', label: 'Colours', glyph: '◐' }] },
 ];
-const SECTION_OF = { 'inline-code': 'code', pagebreak: 'page', vspace: 'page' };
+const SECTION_OF = { 'inline-code': 'code', pagebreak: 'page', vspace: 'page', h1: 'text', h2: 'text', h3: 'text', h4: 'text', p: 'text' };
+/* the levels inside the Text section: vertical tabs on the left, one level's controls on the right */
+const LEVELS_UI = [
+  { id: 'h1', label: 'Heading 1', glyph: 'H1' }, { id: 'h2', label: 'Heading 2', glyph: 'H2' },
+  { id: 'h3', label: 'Heading 3', glyph: 'H3' }, { id: 'h4', label: 'Heading 4', glyph: 'H4' },
+  { id: 'p', label: 'Body', glyph: 'Aa' },
+];
+function TextLevels({ level, setLevel, vars, setVar, onReset }) {
+  const cur = LEVELS_UI.find((l) => l.id === level) || LEVELS_UI[0];
+  return (
+    <div className="th-levels">
+      <div className="th-vtabs" role="tablist">
+        {LEVELS_UI.map((l) => (
+          <button key={l.id} role="tab" aria-selected={l.id === cur.id} className={'th-vtab' + (l.id === cur.id ? ' on' : '')} onClick={() => setLevel(l.id)}>
+            <span className="th-ic">{l.glyph}</span><span>{l.label}</span>
+          </button>
+        ))}
+      </div>
+      <div className="th-vbody">
+        <div className="th-vhead"><span>{cur.label}</span><button className="fmt ico th-reset" title={'Reset ' + cur.label + ' to the theme'} onClick={() => onReset(keysOf(cur.id))}><ResetIcon /></button></div>
+        <Inspector target={cur.id} vars={vars} setVar={setVar} />
+      </div>
+    </div>
+  );
+}
 
 function ThemePane({ themeId, applyTheme, vars, setVar, onReset, focus, caretImage, header, footer, setHeader, setFooter, open, setOpen }) {
   const toggle = (id) => setOpen({ ...open, [id]: !open[id] });
+  const [level, setLevel] = useStateSP('h1');
   const scroll = useRefSP(null);
   const [flashId, setFlashId] = useStateSP(null);
   const cur = THEMES.find((t) => t.id === themeId) || THEMES[0];
@@ -269,6 +290,7 @@ function ThemePane({ themeId, applyTheme, vars, setVar, onReset, focus, caretIma
   useEffectSP(() => {
     if (!focus) return;
     const id = SECTION_OF[focus.kind] || focus.kind;
+    if (id === 'text' && LEVELS_UI.some((l) => l.id === focus.kind)) setLevel(focus.kind);
     const el = scroll.current && scroll.current.querySelector('#th-' + id);
     if (!el) return;
     if (!open[id]) setOpen({ ...open, [id]: true });
@@ -277,7 +299,8 @@ function ThemePane({ themeId, applyTheme, vars, setVar, onReset, focus, caretIma
     const t = setTimeout(() => setFlashId(null), 1400);
     return () => clearTimeout(t);
   }, [focus]);
-  const allKeys = SECTIONS.flatMap((g) => g.items.flatMap((it) => keysOf(it.id)));
+  const keysFor = (id) => (id === 'text' ? LEVELS_UI.flatMap((l) => keysOf(l.id)) : keysOf(id));
+  const allKeys = SECTIONS.flatMap((g) => g.items.flatMap((it) => keysFor(it.id)));
   return (
     <div className="themepane" ref={scroll}>
       <div className="th-top">
@@ -305,10 +328,12 @@ function ThemePane({ themeId, applyTheme, vars, setVar, onReset, focus, caretIma
               <div className="th-head" onClick={() => toggle(it.id)} role="button" aria-expanded={!!open[it.id]}>
                 <span className="th-ic">{it.glyph}</span>
                 <span className="th-label">{it.label}</span>
-                {open[it.id] && keysOf(it.id).length > 0 && <button className="fmt ico th-reset" title="Reset this section to the theme" onClick={(e) => { e.stopPropagation(); onReset(keysOf(it.id)); }}><ResetIcon /></button>}
+                {open[it.id] && keysFor(it.id).length > 0 && <button className="fmt ico th-reset" title="Reset this section to the theme" onClick={(e) => { e.stopPropagation(); onReset(keysFor(it.id)); }}><ResetIcon /></button>}
                 <span className="th-chev">{open[it.id] ? '▾' : '▸'}</span>
               </div>
-              {open[it.id] && <Inspector target={it.id} vars={vars} setVar={setVar} />}
+              {open[it.id] && (it.id === 'text'
+                ? <TextLevels level={level} setLevel={setLevel} vars={vars} setVar={setVar} onReset={onReset} />
+                : <Inspector target={it.id} vars={vars} setVar={setVar} />)}
               {open[it.id] && it.id === 'page' && (
                 <div className="th-sub">
                   <div className="th-sublabel">Running header and footer on every page. <code>{'{page}'}</code> and <code>{'{pages}'}</code> become the numbers.</div>

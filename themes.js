@@ -68,10 +68,10 @@ window.THEMES = [
     },
   },
   {
-    id: 'book', name: 'Book', note: 'Garamond, centred headings, indents',
+    id: 'book', name: 'Book', note: 'Garamond with centred headings',
     vars: {
       'font-body': GARA, 'font-head': GARA, 'font-mono': MONO,
-      'fs-base': '16.5px', 'lh': '1.58', 'scale': '1.2', 'para': '0em', 'p-indent': '1.4em',
+      'fs-base': '16.5px', 'lh': '1.58', 'scale': '1.2', 'para': '0.7em',
       'pad-y': '24mm', 'pad-x': '26mm', 'head-weight': '500', 'head-tracking': '0em',
       'h1-align': 'center', 'h1-bar': '0', 'h1-weight': '400', 'h1-space-below': '1.4em', 'h1-track': '0.01em',
       'h2-align': 'center', 'h2-bar': '0', 'h2-case': 'uppercase', 'h2-track': '0.14em', 'h2-size': '14px', 'h2-weight': '500', 'h2-space': '2.2em', 'h2-space-below': '1em',
@@ -223,7 +223,6 @@ window.expandTheme = function (v) {
     'cap-size': v['cap-size'] || '0.85em', 'cap-color': v['cap-color'] || v['muted'], 'cap-style': v['cap-style'] || 'normal', 'cap-align': v['cap-align'] || 'center',
     'fn-size': v['fn-size'] || '0.82em', 'fn-color': v['fn-color'] || v['muted'],
     'body-hyphens': v['body-hyphens'] || 'auto',
-    'p-indent': v['p-indent'] || '0em',
     'link-deco-color': v['link-deco-color'] || 'currentColor',
     'head-num': v['head-num'] || 'none', 'num-color': v['num-color'] || 'inherit',
     'para-lines': v['para-lines'] || '2',
@@ -261,6 +260,6 @@ window.CSS_ORDER = [
   'img-width', 'img-radius', 'body-align', 'tbl-size', 'tbl-stripe', 'code-size', 'code-border',
   'cap-size', 'cap-color', 'cap-style', 'cap-align', 'fn-size', 'fn-color',
   'h1-color', 'h2-color', 'h3-color', 'h4-color', 'h1-align', 'h2-align', 'h3-align', 'h4-align',
-  'p-indent', 'link-deco-color', 'head-num', 'num-color', 'para-lines', 'body-hyphens',
+  'link-deco-color', 'head-num', 'num-color', 'para-lines', 'body-hyphens',
   'pad-y', 'pad-x', 'measure', 'ink', 'paper', 'accent', 'muted', 'rule', 'code-bg',
 ];

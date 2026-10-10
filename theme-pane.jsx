@@ -17,6 +17,9 @@ const COLOR_SETS = {
 const CASES = ['none', 'uppercase', 'capitalize'];
 const CASE_GLYPH = { none: 'Aa', uppercase: 'AG', capitalize: 'Ab' };
 
+/* a blank line between paragraphs always shows as some space */
+const MIN_PARA = 0.3;
+
 /* ---- primitives ---- */
 function Chips({ value, options, onChange, disabled }) {
   const cur = (value || '').toLowerCase();
@@ -136,14 +139,13 @@ function rowsFor(target) {
       { label: 'Line height', icon: 'lh',     type: 'step',  v: k.lh, step: 0.02, min: 0.8 },
       { label: 'Letter',      icon: 'letter', type: 'step',  v: k.track, unit: 'em', step: 0.005 },
       { label: 'Space above', icon: 'spaceA', type: 'step',  v: k.spaceA, unit: 'em', step: 0.05, min: 0 },
-      { label: 'Space below', icon: 'spaceB', type: 'step',  v: k.spaceB, unit: 'em', step: 0.05, min: 0 },
+      { label: 'Space below', icon: 'spaceB', type: 'step',  v: k.spaceB, unit: 'em', step: 0.05, min: target === 'p' ? MIN_PARA : 0 },
       { label: 'Case',        icon: 'case',   type: 'case',  v: k.case },
       { label: 'Colour',      icon: 'color',  type: 'color', v: k.color, opts: target === 'p' ? 'ink' : 'head' },
       { label: 'Under-bar',   icon: 'bar',    type: 'toggle', v: k.bar, on: '1', off: '0' },
     ];
     if (target === 'p') {
       rows.push({ label: 'Justify', icon: 'align', type: 'toggle', v: 'body-align', on: 'justify', off: 'left' });
-      rows.push({ label: 'First-line indent', icon: 'indent', type: 'step', v: 'p-indent', unit: 'em', step: 0.25, min: 0, max: 4 });
     } else {
       rows.splice(8, 0, { label: 'Align', icon: 'align', type: 'seg', v: k.align, opts: [['left', 'Left'], ['center', 'Centre'], ['right', 'Right']] });
     }
@@ -210,7 +212,7 @@ function rowsFor(target) {
       { label: 'Body font', icon: 'font', type: 'font', v: 'font-body' },
       { label: 'Base size', icon: 'size', type: 'basesize', v: 'fs-base', unit: 'px', step: 0.5, min: 9, max: 24, tip: 'Body text size; headings scale with it' },
       { label: 'Line height', icon: 'lh', type: 'step', v: 'lh', step: 0.02, min: 1, max: 2.4 },
-      { label: 'Paragraph gap', icon: 'spaceB', type: 'step', v: 'para', unit: 'em', step: 0.05, min: 0, max: 2.5 },
+      { label: 'Paragraph gap', icon: 'spaceB', type: 'step', v: 'para', unit: 'em', step: 0.05, min: MIN_PARA, max: 2.5, tip: 'The space a blank line between paragraphs makes' },
       { label: 'Hyphenate', icon: 'letter', type: 'toggle', v: 'body-hyphens', on: 'auto', off: 'manual' },
       { label: 'Numbering', icon: 'marker', type: 'seg', v: 'head-num', opts: [['none', 'Off'], ['h1', 'From H1'], ['h2', 'From H2']], tip: 'Number headings 1, 1.1, 1.1.1. "From H2" keeps Heading 1 as an unnumbered title' },
     ];

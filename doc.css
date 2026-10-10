@@ -130,8 +130,6 @@
   text-align: var(--body-align, justify); hyphens: var(--body-hyphens, auto); margin: var(--para-above, 0em) 0 var(--para);
   padding-bottom: calc(var(--body-bar, 0) * 0.25em); border-bottom: calc(var(--body-bar, 0) * 1px) solid var(--rule);
 }
-.doc p + p { text-indent: var(--p-indent, 0em); }
-.doc p.tcap, .doc p.split-rest { text-indent: 0; }
 /* a paragraph that continues on the next page: its last line here is a full line */
 .doc p.split-head { text-align-last: var(--body-align, justify); margin-bottom: 0; }
 .doc a { color: var(--link-color, var(--accent)); text-decoration-line: var(--link-deco, none); text-decoration-color: var(--link-deco-color, currentColor); text-decoration-thickness: 1px; text-underline-offset: 2px; }

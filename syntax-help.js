@@ -22,7 +22,7 @@ window.SYNTAX = (() => {
     { id: 'strike', group: G.text, kind: 'wrap', open: '~~', close: '~~', glyph: 'S', label: 'Strikethrough', syntax: '~~struck~~', desc: 'Crossed-out text.', tool: 'strike' },
     { id: 'code',   group: G.text, kind: 'wrap', open: '`',  close: '`',  glyph: '<>', label: 'Inline code',  syntax: '`code`',     desc: 'Monospace, inline.' },
     { id: 'link',   group: G.text, kind: 'wrap', open: '[',  close: '](https://)', glyph: '🔗', label: 'Link', syntax: '[text](https://…)', desc: 'A hyperlink. Printed links keep their colour but are not clickable on paper.', tool: 'link', key: 'Mod-k' },
-    { id: 'br', note: 'line break',     group: G.text, kind: 'wrap', open: '', close: '\\', glyph: '↵', label: 'Line break', syntax: 'text\\', desc: 'A backslash at the very end of a line breaks the line without starting a new paragraph. Two trailing spaces do the same.' },
+    { id: 'br', note: 'line break',     group: G.text, kind: 'wrap', open: '', close: '\\', glyph: '↵', label: 'Line break', syntax: 'text\\', desc: 'Press Enter once: the next line starts on a new line in the same paragraph. Leave a blank line for a new paragraph. A trailing backslash also works.' },
     { id: 'footnote', note: 'footnote', group: G.text, kind: 'wrap', open: '', close: '[^1]', glyph: '¹', label: 'Footnote', syntax: '[^1] … [^1]: note', desc: 'A numbered reference. Put the note itself on its own line anywhere: `[^1]: The note.` Notes are collected at the end of the document.', after: '\n\n[^1]: ' },
 
     { id: 'ul',   group: G.lists, kind: 'prefix', prefix: '- ',     glyph: '•',  label: 'Bullet list',   syntax: '- item',       desc: 'One item per line. Indent two spaces to nest.', tool: 'bullet' },

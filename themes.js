@@ -42,10 +42,10 @@ window.THEMES = [
     },
   },
   {
-    id: 'academic', name: 'Academic', note: 'Numbered sections, indented paragraphs',
+    id: 'academic', name: 'Academic', note: 'Classic serif with numbered sections',
     vars: {
       'font-body': SERIF, 'font-head': SERIF, 'font-mono': MONO,
-      'fs-base': '15.5px', 'lh': '1.66', 'scale': '1.18', 'para': '0em', 'p-indent': '1.5em',
+      'fs-base': '15.5px', 'lh': '1.66', 'scale': '1.18', 'para': '0.8em',
       'page-pad': '25mm', 'head-weight': '600', 'head-tracking': '0em', 'head-num': 'h2',
       'h1-align': 'center', 'h1-bar': '0', 'h1-weight': '600', 'h1-space-below': '1.1em', 'h2-bar': '0',
       'h2-space-below': '0.4em', 'h3-space-below': '0.3em', 'h3-weight': '600',

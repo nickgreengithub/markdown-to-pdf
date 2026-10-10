@@ -2,6 +2,7 @@
    Dialect — the Markdown the app understands, and how it renders.
 
    CommonMark + GFM tables / strikethrough / task lists, plus:
+     a single new line                a line break (a blank line starts a new paragraph)
      \pagebreak                       force a new page
      \                                one blank line of vertical space (repeatable)
      \vspace 3                        three lines of vertical space
@@ -198,7 +199,8 @@
 
   function make(opts) {
     const o = Object.assign({ resolveImage: (src) => src }, opts || {});
-    const md = new MarkdownIt({ html: false, linkify: false, typographer: false, breaks: false });
+    // breaks: a single new line inside a paragraph is a line break, as people expect when they press Enter
+    const md = new MarkdownIt({ html: false, linkify: false, typographer: false, breaks: true });
     if (footnote) md.use(footnote);
     md.block.ruler.before('paragraph', 'directive', directiveRule, { alt: ['paragraph', 'reference', 'blockquote', 'list'] });
     md.core.ruler.push('image_attrs', imageAttrsRule);
@@ -210,7 +212,7 @@
     md.renderer.rules.directive = renderDirective;
     // captions render with a plain instance: the footnote plugin's tail rule
     // would otherwise dump the footnote list into every caption
-    const capMd = new MarkdownIt({ html: false, breaks: false });
+    const capMd = new MarkdownIt({ html: false, breaks: true });
 
     md.renderer.rules.image = (tokens, idx, options, env, self) => {
       const t = tokens[idx];

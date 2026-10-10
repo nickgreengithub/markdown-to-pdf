@@ -50,6 +50,10 @@ function App() {
   const [vars, setVars] = useState(() => {
     const persisted = getJSON(LS.vars, getJSON('mdv2.vars', null)); // the previous version's key, if any
     const base = expandTheme(getTheme(get(LS.theme, get('mdv2.theme', t0.id))).vars);
+    if (persisted && persisted['p-indent'] === '1.5em' && persisted.para === '0em' && get(LS.theme, '') === 'academic') {
+      // Academic used to indent first lines with no paragraph gap; it no longer does
+      persisted['p-indent'] = base['p-indent']; persisted.para = base.para;
+    }
     return persisted ? { ...base, ...persisted, paper: '#ffffff' } : base;
   });
   const [ui, setUi] = useState(() => {

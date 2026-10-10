@@ -47,7 +47,7 @@ CommonMark + GFM tables, strikethrough and task lists, plus:
 | `\toc` | A table of contents of the headings after it (H1–H3), with page numbers |
 | `Table: Caption` | Directly above or below a table: its caption |
 | `## Heading {-}` | Leave this heading out of automatic numbering |
-| `text\` at the end of a line | A line break without a new paragraph |
+| A single new line | A line break without a new paragraph (a blank line starts a new paragraph) |
 | `![alt](name "Figure 2. Caption")` | An image from the library; the title is the caption (inline markdown allowed) |
 | `![alt](name "…"){width=50% align=right}` | Width and alignment — the style popover writes these for you |
 | `[^1]` … `[^1]: note` | Footnotes, collected at the end |

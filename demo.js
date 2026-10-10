@@ -68,8 +68,8 @@ See also our earlier work, [On the Feasibility of Catapulting Commuters](https:/
 
 This paragraph exists purely so the **Body** style can prove it stays calm and readable, even while the surrounding text describes terrifying acceleration. Well done, body text. Stay strong.
 
-A line can be broken without starting a new paragraph\\
-by ending it with a backslash — useful for addresses,\\
+A single new line breaks the line without starting a new paragraph —
+useful for addresses, title blocks,
 poetry, and dramatic pauses.
 
 \\

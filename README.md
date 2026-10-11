@@ -28,7 +28,8 @@ No build step, no backend, no accounts: everything stays in your browser.
   heading numbering. Click an element on the page and its section scrolls into view.
   Eleven themes: Report, Academic, Editorial, Book, Technical, Modern, Minimal, Letter,
   Memo, Résumé and Compact.
-- **Images**: paste or drop an image anywhere; it is stored in your browser under a short
+- **Images**: choose Image in the `/` menu to pick files from your computer, or paste or
+  drop an image anywhere; it is stored in your browser under a short
   name and `![](name)` lands at the caret, with a thumbnail under the line. Add a quoted
   title for the caption. Nothing to manage; "Remove unused images" lives in the New document
   dialog.

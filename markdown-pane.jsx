@@ -109,8 +109,20 @@ const MD = (() => {
     view.dispatch({ changes: { from, to, insert: clean }, selection: EditorSelection.cursor(cursor), scrollIntoView: true });
     view.focus();
   }
+  /* the system file picker; chosen images go the same way as pasted ones.
+     Must run inside the click or key press that picked the menu item. */
+  function pickImages(view) {
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = 'image/*'; inp.multiple = true;
+    inp.addEventListener('change', () => {
+      const files = [...(inp.files || [])].filter((f) => /^image\//.test(f.type));
+      if (files.length && api.onImages) api.onImages(files, view);
+    });
+    inp.click();
+  }
   function apply(view, item) {
     if (!item) return;
+    if (item.pick === 'image') return pickImages(view);
     if (item.kind === 'prefix') return setLinePrefix(view, item);
     if (item.kind === 'wrap') return wrap(view, item);
     if (item.kind === 'line') return insertBlock(view, item.line);
@@ -123,7 +135,8 @@ const MD = (() => {
     view.dispatch({ changes: { from: r.from, to: r.to, insert: text }, selection: EditorSelection.cursor(r.from + text.length), scrollIntoView: true });
     view.focus();
   }
-  return { apply, setLinePrefix, wrap, insertBlock, insertAtCaret };
+  const api = { apply, setLinePrefix, wrap, insertBlock, insertAtCaret, pickImages, onImages: null };
+  return api;
 })();
 
 /* which construct is at a position: line-level first, then the syntax tree */
@@ -406,6 +419,7 @@ function MarkdownPane({ initial, onDocChange, onCaret, onImageFiles, onActive, b
       parent: host.current,
     });
     viewRef.current = view;
+    MD.onImages = (files) => cbs.current.onImageFiles(files, view);
     const unsub = Library.subscribe(() => view.dispatch({ effects: libTick.of(null) })); // thumbnails follow the store
     bus.current.md = {
       view,
